@@ -156,7 +156,7 @@ header h1{font-size:21px;margin:0}
     <button class="btn ghost" id="exportBtn">📦 أخذ نسخة احتياطية مشفّرة</button>
     <label class="btn ghost" style="text-align:center">📥 استيراد نسخة احتياطية<input id="importPicker" type="file" accept=".vault,application/octet-stream" hidden></label>
     <button class="btn ghost" id="dupBtn">🧹 حذف الصور والفيديوهات المكررة</button>
-    <p>يحذف النسخ المتطابقة ويخلي نسخة وحدة من كل ملف. المجلدات المقفلة تدخل في الفحص إذا كانت مفتوحة.</p>
+    <p>الفحص يصير تلقائيًا كل ما تفتح الخزنة أو مجلد مقفل، وهذا الزر لفحص يدوي. يخلي نسخة وحدة من كل ملف.</p>
     <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز. المجلدات المقفلة تنتقل بأرقامها السرية.</p>
     <button class="btn danger" id="wipeBtn">حذف الخزنة بالكامل من هذا الجهاز</button>
     <button class="btn" id="setClose">تم</button>
@@ -296,6 +296,7 @@ async function openFolder(fid) {
   }
   cur = fid; $('#q').value = ''; query = '';
   render(); scrollTo(0, 0);
+  if (f.locked) cleanDups(true);
 }
 function leaveFolder() {
   if (busy) return toast('انتظر لين ينتهي الحفظ');
@@ -497,11 +498,13 @@ async function enterApp() {
   try { await navigator.storage?.persist?.(); } catch {}
   $('#grid').innerHTML = ''; $('#fgrid').innerHTML = ''; $('#empty').hidden = false; $('#empty').textContent = 'جاري فتح الخزنة…';
   await loadFolders(); await loadItems(); render();
+  cleanDups(true);
 }
 
 function lock() {
   KEY = null; closeViewer();
   ['#settings', '#askModal', '#act'].forEach(s => $(s).hidden = true);
+  hideToast();
   items.forEach(it => it.thumb && URL.revokeObjectURL(it.thumb));
   items = []; folders = []; fkeys.clear(); counts.clear(); cur = null;
   $('#grid').innerHTML = ''; $('#fgrid').innerHTML = '';
@@ -600,10 +603,11 @@ async function findDup(h, size) {
   }
   return null;
 }
-async function cleanDups() {
+async function cleanDups(auto = false) {
+  if (auto && busy) return;
   busy++;
   try {
-    toast('جاري البحث عن الملفات المكررة…', 0);
+    if (!auto) toast('جاري البحث عن الملفات المكررة…', 0);
     const bySize = new Map();
     for (const it of items) { const a = bySize.get(it.size) || []; a.push(it); bySize.set(it.size, a); }
     const byHash = new Map();
@@ -614,21 +618,23 @@ async function cleanDups() {
     const del = [];
     for (const a of byHash.values()) {
       if (a.length < 2) continue;
-      // نخلي النسخة اللي داخل مجلد إن وجدت، وإلا الأقدم
-      a.sort((x, y) => (!!effFid(y.fid) - !!effFid(x.fid)) || (x.added - y.added));
+      // نخلي النسخة الأكثر حماية: مجلد مقفل ثم مجلد عادي ثم الرئيسية، ثم الأقدم
+      const rank = it => { const f = folder(effFid(it.fid)); return f ? (f.locked ? 2 : 1) : 0; };
+      a.sort((x, y) => (rank(y) - rank(x)) || (x.added - y.added));
       del.push(...a.slice(1));
     }
-    hideToast();
-    if (!del.length) return toast('ما فيه ملفات مكررة ✓');
-    if (!confirm(`لقيت ${del.length} ملف مكرر.\nأحذفها وأخلي نسخة وحدة من كل ملف؟`)) return;
+    if (!auto) hideToast();
+    if (!del.length) { if (!auto) toast('ما فيه ملفات مكررة ✓'); return; }
+    if (!auto && !confirm(`لقيت ${del.length} ملف مكرر.\nأحذفها وأخلي نسخة وحدة من كل ملف؟`)) return;
     const tr = db.transaction(['meta', 'blobs'], 'readwrite');
     del.forEach(d => { tr.objectStore('meta').delete(d.id); tr.objectStore('blobs').delete(d.id); });
     await done(tr);
     const gone = new Set(del);
     del.forEach(d => { if (d.thumb) URL.revokeObjectURL(d.thumb); bump(effFid(d.fid), -1); });
     items = items.filter(x => !gone.has(x));
-    render(); toast(`تم حذف ${del.length} ملف مكرر ✓`, 4000);
-  } catch (e) { console.error(e); toast('تعذّر حذف المكرر'); }
+    if (!$('#viewer').hidden && viewList.some(x => gone.has(x))) closeViewer();
+    render(); toast(`🧹 تم حذف ${del.length} ملف مكرر تلقائيًا ✓`, 4500);
+  } catch (e) { console.error(e); if (!auto) toast('تعذّر حذف المكرر'); }
   finally { busy--; lastActive = Date.now(); }
 }
 $('#dupBtn').onclick = () => { $('#settings').hidden = true; cleanDups(); };
@@ -891,7 +897,7 @@ $('#importPicker').onchange = async e => {
       if (key) { try { items.push(await decRec(rec, key)); } catch {} }
       bump(fid, 1); added++;
     }
-    items.sort(byDate); render();
+    items.sort(byDate); render(); setTimeout(() => cleanDups(true), 4600);
     toast(`تم استيراد ${added} عنصر${newF ? ` و${newF} مجلد` : ''} ✓${skipped ? ` (تم تخطي ${skipped})` : ''}`, 4500);
   } catch (e) { console.error(e); toast('تعذّر الاستيراد: ' + (e.message || e), 4000); }
   finally { busy--; lastActive = Date.now(); }
