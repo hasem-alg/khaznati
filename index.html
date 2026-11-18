@@ -155,6 +155,8 @@ header h1{font-size:21px;margin:0}
     <p>كل ملفاتك مشفّرة (AES-256) ومحفوظة على هذا الجهاز فقط. ما تنرسل لأي سيرفر.</p>
     <button class="btn ghost" id="exportBtn">📦 أخذ نسخة احتياطية مشفّرة</button>
     <label class="btn ghost" style="text-align:center">📥 استيراد نسخة احتياطية<input id="importPicker" type="file" accept=".vault,application/octet-stream" hidden></label>
+    <button class="btn ghost" id="dupBtn">🧹 حذف الصور والفيديوهات المكررة</button>
+    <p>يحذف النسخ المتطابقة ويخلي نسخة وحدة من كل ملف. المجلدات المقفلة تدخل في الفحص إذا كانت مفتوحة.</p>
     <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز. المجلدات المقفلة تنتقل بأرقامها السرية.</p>
     <button class="btn danger" id="wipeBtn">حذف الخزنة بالكامل من هذا الجهاز</button>
     <button class="btn" id="setClose">تم</button>
@@ -575,6 +577,62 @@ $('#q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); 
 $('#backBtn').onclick = leaveFolder;
 $('#fMenu').onclick = folderMenu;
 
+/* ---------- كشف المكرر ---------- */
+const sha = async buf => b64(await crypto.subtle.digest('SHA-256', buf));
+async function saveMeta(it) {
+  const k = keyFor(effFid(it.fid)), r = await P(store('meta').get(it.id));
+  const m = await encJSON(k, { name: it.name, type: it.type, size: it.size, added: it.added, h: it.h });
+  r.iv = m.iv; r.ct = m.ct;
+  await P(store('meta', 'readwrite').put(r));
+}
+// بصمة ملف موجود — تنحسب مرة وحدة وتنحفظ مشفّرة مع بياناته
+async function hashOf(it) {
+  if (it.h) return it.h;
+  const r = await P(store('blobs').get(it.id));
+  it.h = await sha(await decryptBuf(keyFor(effFid(it.fid)), r.iv, r.ct));
+  try { await saveMeta(it); } catch {}
+  return it.h;
+}
+async function findDup(h, size) {
+  for (const it of items) {
+    if (it.size !== size) continue;   // الملفات المتطابقة لازم يكون حجمها نفسه
+    try { if (await hashOf(it) === h) return it; } catch {}
+  }
+  return null;
+}
+async function cleanDups() {
+  busy++;
+  try {
+    toast('جاري البحث عن الملفات المكررة…', 0);
+    const bySize = new Map();
+    for (const it of items) { const a = bySize.get(it.size) || []; a.push(it); bySize.set(it.size, a); }
+    const byHash = new Map();
+    for (const a of bySize.values()) {
+      if (a.length < 2) continue;
+      for (const it of a) { try { const h = await hashOf(it); if (!byHash.has(h)) byHash.set(h, []); byHash.get(h).push(it); } catch {} }
+    }
+    const del = [];
+    for (const a of byHash.values()) {
+      if (a.length < 2) continue;
+      // نخلي النسخة اللي داخل مجلد إن وجدت، وإلا الأقدم
+      a.sort((x, y) => (!!effFid(y.fid) - !!effFid(x.fid)) || (x.added - y.added));
+      del.push(...a.slice(1));
+    }
+    hideToast();
+    if (!del.length) return toast('ما فيه ملفات مكررة ✓');
+    if (!confirm(`لقيت ${del.length} ملف مكرر.\nأحذفها وأخلي نسخة وحدة من كل ملف؟`)) return;
+    const tr = db.transaction(['meta', 'blobs'], 'readwrite');
+    del.forEach(d => { tr.objectStore('meta').delete(d.id); tr.objectStore('blobs').delete(d.id); });
+    await done(tr);
+    const gone = new Set(del);
+    del.forEach(d => { if (d.thumb) URL.revokeObjectURL(d.thumb); bump(effFid(d.fid), -1); });
+    items = items.filter(x => !gone.has(x));
+    render(); toast(`تم حذف ${del.length} ملف مكرر ✓`, 4000);
+  } catch (e) { console.error(e); toast('تعذّر حذف المكرر'); }
+  finally { busy--; lastActive = Date.now(); }
+}
+$('#dupBtn').onclick = () => { $('#settings').hidden = true; cleanDups(); };
+
 /* ---------- إضافة ملفات ---------- */
 async function imageThumb(file) {
   const url = URL.createObjectURL(file);
@@ -611,7 +669,7 @@ async function addFiles(files) {
   if (!key) return toast('افتح المجلد أول');
   const big = files.filter(f => f.size > 300 * 1024 * 1024);
   if (big.length && !confirm(`فيه ${big.length} ملف حجمه أكبر من 300 م.ب. الملفات الكبيرة جدًا ممكن تكون بطيئة على الجوال. أكمل؟`)) return;
-  busy++; let ok = 0;
+  busy++; let ok = 0, dups = 0;
   try {
     for (let i = 0; i < files.length; i++) {
       const f = files[i];
@@ -619,9 +677,12 @@ async function addFiles(files) {
       try {
         const type = f.type || guessType(f.name);
         const buf = await f.arrayBuffer();
+        const h = await sha(buf);
+        const dup = await findDup(h, f.size);
+        if (dup) { dups++; continue; }
         const th = kind(type) === 'img' ? await imageThumb(f) : kind(type) === 'vid' ? await videoThumb(f) : null;
         const id = newId();
-        const meta = { name: f.name, type, size: f.size, added: Date.now() };
+        const meta = { name: f.name, type, size: f.size, added: Date.now(), h };
         const m = await encJSON(key, meta), d = await encryptBuf(key, buf), t = th ? await encryptBuf(key, th) : null;
         const tr = db.transaction(['meta', 'blobs'], 'readwrite');
         tr.objectStore('meta').put({ id, fid, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
@@ -635,7 +696,7 @@ async function addFiles(files) {
         await sleep(1800);
       }
     }
-    toast(`تم حفظ ${ok} من ${files.length} ✓`);
+    toast(`تم حفظ ${ok} ملف ✓` + (dups ? ` · تم تخطي ${dups} مكرر` : ''), dups ? 4500 : 2600);
   } finally { busy--; lastActive = Date.now(); }
 }
 $('#picker').onchange = e => { const fs = e.target.files; addFiles(fs).finally(() => e.target.value = ''); };
