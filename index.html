@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1220">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="خزنتي">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' blob: data:; media-src 'self' blob:; frame-src blob:; object-src 'none'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; base-uri 'none'; form-action 'none'">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<title>خزنتي</title>
+<style>
+:root{--bg:#0b1220;--panel:#121b2e;--panel2:#1a2540;--line:#26324f;--text:#e8edf7;--mute:#8d9bb8;--acc:#4f8cff;--danger:#ff5d6c;--ok:#35c48b;--r:14px}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,"SF Arabic","Segoe UI","Tahoma",system-ui,sans-serif;font-size:16px}
+body.veil #app,body.veil #viewer{filter:blur(28px)}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none}
+[hidden]{display:none!important}
+.btn{background:var(--acc);color:#fff;border-radius:12px;padding:12px 18px;font-weight:600}
+.btn:disabled{opacity:.5}
+.btn.ghost{background:var(--panel2);color:var(--text)}
+.btn.danger{background:transparent;color:var(--danger);border:1px solid #5a2a35}
+.in{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:13px 14px;outline:none}
+.in:focus{border-color:var(--acc)}
+/* lock */
+#lock{min-height:100%;display:flex;align-items:center;justify-content:center;padding:24px}
+.lockbox{width:100%;max-width:360px;text-align:center}
+.logo{width:84px;height:84px;border-radius:22px;margin:0 auto 18px;display:block}
+.lockbox h1{font-size:22px;margin:0 0 6px}
+.lockbox p{color:var(--mute);margin:0 0 20px;font-size:14px;line-height:1.7}
+.lockbox form{display:grid;gap:10px}
+#lockMsg{min-height:22px;font-size:14px;color:var(--danger);margin-top:6px}
+.link{color:var(--mute);font-size:13px;margin-top:18px;text-decoration:underline}
+/* app */
+#app{max-width:1100px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 90px)}
+header{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+header .t{flex:1;min-width:0}
+header h1{font-size:21px;margin:0}
+#count{color:var(--mute);font-size:12px}
+.ib{width:42px;height:42px;border-radius:12px;background:var(--panel2);display:grid;place-items:center;font-size:19px}
+.tabs{display:flex;gap:6px;overflow-x:auto;margin-bottom:10px;scrollbar-width:none}
+.tabs button{padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);white-space:nowrap;font-size:14px}
+.tabs button.on{background:var(--acc);color:#fff}
+#q{margin-bottom:12px}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px}
+.card{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--panel);display:block;padding:0}
+.card img{width:100%;height:100%;object-fit:cover;display:block}
+.card .ic{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--acc);padding-bottom:22px;text-transform:uppercase}
+.card .cap{position:absolute;inset:auto 0 0 0;font-size:11px;padding:16px 6px 5px;background:linear-gradient(transparent,rgba(0,0,0,.75));white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.card .play{position:absolute;top:6px;left:6px;background:rgba(0,0,0,.55);border-radius:8px;font-size:11px;padding:2px 6px}
+#empty{color:var(--mute);text-align:center;padding:60px 20px;line-height:1.8}
+.fab{position:fixed;bottom:calc(env(safe-area-inset-bottom) + 20px);left:50%;transform:translateX(-50%);background:var(--acc);color:#fff;border-radius:999px;padding:14px 26px;font-weight:700;box-shadow:0 8px 24px rgba(79,140,255,.35);display:flex;gap:8px;align-items:center}
+/* viewer */
+#viewer{position:fixed;inset:0;background:#000;z-index:20;display:flex;flex-direction:column}
+.vbar{display:flex;align-items:center;gap:8px;padding:calc(env(safe-area-inset-top) + 8px) 10px 8px;background:rgba(0,0,0,.6)}
+.vbar .t{flex:1;min-width:0}
+#vName{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;font-size:15px}
+#vInfo{color:var(--mute);font-size:12px}
+.vbar .ib{background:rgba(255,255,255,.1)}
+#vBody{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+#vBody img,#vBody video{max-width:100%;max-height:100%;object-fit:contain}
+#vBody iframe{width:100%;height:100%;border:0;background:#fff}
+#vBody audio{width:90%}
+.nofmt,.spin{color:var(--mute);text-align:center;padding:30px;line-height:1.8}
+.nav{position:absolute;top:50%;transform:translateY(-50%);width:44px;height:64px;font-size:30px;color:#fff;background:rgba(255,255,255,.08);border-radius:10px;z-index:2}
+#vPrev{right:8px}#vNext{left:8px}
+/* sheets */
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--panel);width:100%;max-width:520px;border-radius:20px 20px 0 0;padding:20px 18px calc(env(safe-area-inset-bottom) + 20px);display:grid;gap:10px}
+@media(min-width:600px){.ov{align-items:center}.sheet{border-radius:20px}}
+.sheet h2{margin:0 0 4px;font-size:18px}
+.sheet p{margin:0;color:var(--mute);font-size:13px;line-height:1.7}
+.meter{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--acc);width:0}
+#toast{position:fixed;top:calc(env(safe-area-inset-top) + 12px);left:50%;transform:translateX(-50%);background:#1f2b47;border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+</style>
+</head>
+<body>
+
+<!-- شاشة القفل -->
+<section id="lock">
+  <div class="lockbox">
+    <img class="logo" src="icon-192.png" alt="">
+    <h1 id="lockTitle">خزنتي</h1>
+    <p id="lockHint"></p>
+    <form id="lockForm" autocomplete="off">
+      <input id="pw1" class="in" type="password" placeholder="كلمة المرور" autocomplete="current-password" required>
+      <input id="pw2" class="in" type="password" placeholder="أعد كتابة كلمة المرور" autocomplete="new-password" hidden>
+      <button id="lockBtn" class="btn" type="submit">فتح</button>
+    </form>
+    <div id="lockMsg"></div>
+    <button id="forgot" class="link" type="button" hidden>نسيت كلمة المرور؟</button>
+  </div>
+</section>
+
+<!-- التطبيق -->
+<main id="app" hidden>
+  <header>
+    <div class="t"><h1>خزنتي</h1><div id="count"></div></div>
+    <button class="ib" id="setBtn" title="الإعدادات" aria-label="الإعدادات">⚙️</button>
+    <button class="ib" id="lockNow" title="قفل" aria-label="قفل">🔒</button>
+  </header>
+  <nav class="tabs" id="tabs">
+    <button data-f="all" class="on">الكل</button>
+    <button data-f="img">الصور</button>
+    <button data-f="vid">الفيديو</button>
+    <button data-f="file">الملفات</button>
+  </nav>
+  <input id="q" class="in" type="search" placeholder="ابحث باسم الملف…">
+  <div id="grid"></div>
+  <div id="empty" hidden></div>
+  <label class="fab"><span>＋</span> إضافة<input id="picker" type="file" multiple hidden></label>
+</main>
+
+<!-- العارض -->
+<section id="viewer" hidden>
+  <div class="vbar">
+    <button class="ib" id="vClose" aria-label="إغلاق">✕</button>
+    <div class="t"><div id="vName"></div><div id="vInfo"></div></div>
+    <button class="ib" id="vShare" aria-label="مشاركة أو حفظ">⤴︎</button>
+    <button class="ib" id="vDown" aria-label="تنزيل">⬇︎</button>
+    <button class="ib" id="vDel" aria-label="حذف">🗑</button>
+  </div>
+  <div id="vBody"></div>
+  <button class="nav" id="vPrev" aria-label="السابق">‹</button>
+  <button class="nav" id="vNext" aria-label="التالي">›</button>
+</section>
+
+<!-- الإعدادات -->
+<div class="ov" id="settings" hidden>
+  <div class="sheet">
+    <h2>الإعدادات</h2>
+    <p id="storeInfo">…</p>
+    <div class="meter"><i id="storeBar"></i></div>
+    <p>كل ملفاتك مشفّرة (AES-256) ومحفوظة على هذا الجهاز فقط. ما تنرسل لأي سيرفر.</p>
+    <button class="btn ghost" id="exportBtn">📦 أخذ نسخة احتياطية مشفّرة</button>
+    <label class="btn ghost" style="text-align:center">📥 استيراد نسخة احتياطية<input id="importPicker" type="file" accept=".vault,application/octet-stream" hidden></label>
+    <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز.</p>
+    <button class="btn danger" id="wipeBtn">حذف الخزنة بالكامل من هذا الجهاز</button>
+    <button class="btn" id="setClose">تم</button>
+  </div>
+</div>
+
+<!-- نافذة كلمة المرور -->
+<div class="ov" id="pwModal" hidden>
+  <form class="sheet" id="pwForm" autocomplete="off">
+    <h2 id="pwTitle"></h2>
+    <p id="pwText"></p>
+    <input id="pwIn" class="in" type="password" placeholder="كلمة المرور">
+    <button class="btn" type="submit">متابعة</button>
+    <button class="btn ghost" type="button" id="pwCancel">إلغاء</button>
+  </form>
+</div>
+
+<div id="toast" hidden></div>
+
+<script>
+'use strict';
+const $ = s => document.querySelector(s);
+const enc = new TextEncoder(), dec = new TextDecoder();
+const ITER = 310000, MAGIC = 'KHZN1', LOCK_MS = 5 * 60 * 1000, HIDDEN_LOCK_MS = 60 * 1000;
+let db = null, KEY = null, items = [], filter = 'all', query = '', busy = 0;
+let lastActive = Date.now(), hiddenAt = 0, viewList = [], viewIdx = -1, viewUrl = null, viewBlob = null, viewToken = 0;
+
+/* ---------- أدوات ---------- */
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const b64 = u => { u = new Uint8Array(u); let s = ''; for (let i = 0; i < u.length; i += 0x8000) s += String.fromCharCode.apply(null, u.subarray(i, i + 0x8000)); return btoa(s); };
+const unb64 = s => Uint8Array.from(atob(s), c => c.charCodeAt(0));
+const u32 = n => { const b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n, true); return b; };
+const newId = () => crypto.randomUUID ? crypto.randomUUID() : b64(crypto.getRandomValues(new Uint8Array(16)));
+function fmt(n) { if (n < 1024) return n + ' بايت'; const u = ['ك.ب', 'م.ب', 'ج.ب']; let i = -1; do { n /= 1024; i++; } while (n >= 1024 && i < 2); return n.toFixed(n < 10 ? 1 : 0) + ' ' + u[i]; }
+const ext = n => (n.includes('.') ? n.split('.').pop() : 'ملف').slice(0, 5);
+const kind = t => t.startsWith('image/') ? 'img' : t.startsWith('video/') ? 'vid' : 'file';
+const TYPES = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif', mp4:'video/mp4', mov:'video/quicktime', m4v:'video/mp4', webm:'video/webm', mp3:'audio/mpeg', m4a:'audio/mp4', wav:'audio/wav', pdf:'application/pdf', txt:'text/plain' };
+const guessType = n => TYPES[ext(n).toLowerCase()] || 'application/octet-stream';
+let toastT;
+function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); if (ms) toastT = setTimeout(() => t.hidden = true, ms); }
+function download(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
+
+/* ---------- قاعدة البيانات المحلية ---------- */
+function openDB() {
+  return new Promise((res, rej) => {
+    const r = indexedDB.open('khaznati', 1);
+    r.onupgradeneeded = () => { const d = r.result; d.createObjectStore('config'); d.createObjectStore('meta', { keyPath: 'id' }); d.createObjectStore('blobs', { keyPath: 'id' }); };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+const P = r => new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+const done = t => new Promise((res, rej) => { t.oncomplete = () => res(); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error || new Error('abort')); });
+const store = (n, m = 'readonly') => db.transaction(n, m).objectStore(n);
+const cfgGet = k => P(store('config').get(k));
+const cfgSet = (k, v) => P(store('config', 'readwrite').put(v, k));
+
+/* ---------- التشفير ---------- */
+async function deriveKey(pass, salt, iter) {
+  const base = await crypto.subtle.importKey('raw', enc.encode(pass), 'PBKDF2', false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt, iterations: iter, hash: 'SHA-256' }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function encryptBuf(key, buf) { const iv = crypto.getRandomValues(new Uint8Array(12)); const ct = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, buf); return { iv, ct }; }
+const decryptBuf = (key, iv, ct) => crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+const encJSON = (k, o) => encryptBuf(k, enc.encode(JSON.stringify(o)));
+const decJSON = async (k, iv, ct) => JSON.parse(dec.decode(await decryptBuf(k, iv, ct)));
+
+/* ---------- القفل ---------- */
+async function initLock() {
+  const v = await cfgGet('vault');
+  const setup = !v;
+  $('#pw2').hidden = !setup; $('#pw2').required = setup;
+  $('#lockTitle').textContent = setup ? 'أنشئ خزنتك الخاصة' : 'خزنتي مقفلة';
+  $('#lockHint').textContent = setup
+    ? 'اختر كلمة مرور قوية (8 أحرف أو أكثر). كل ملفاتك تتشفّر فيها، وإذا نسيتها ما أحد يقدر يرجّع الملفات — ولا حتى أنت.'
+    : 'اكتب كلمة المرور لفتح صورك وملفاتك.';
+  $('#lockBtn').textContent = setup ? 'إنشاء الخزنة' : 'فتح';
+  $('#pw1').autocomplete = setup ? 'new-password' : 'current-password';
+  $('#forgot').hidden = setup;
+  $('#lockMsg').textContent = '';
+  $('#app').hidden = true; $('#lock').hidden = false;
+  setTimeout(() => $('#pw1').focus(), 50);
+}
+const lockMsg = (m, ok) => { const e = $('#lockMsg'); e.textContent = m; e.style.color = ok ? 'var(--mute)' : 'var(--danger)'; };
+
+$('#lockForm').onsubmit = async e => {
+  e.preventDefault();
+  const pw = $('#pw1').value, btn = $('#lockBtn');
+  const v = await cfgGet('vault');
+  if (!v) {
+    if (pw.length < 8) return lockMsg('كلمة المرور لازم تكون 8 أحرف على الأقل');
+    if (pw !== $('#pw2').value) return lockMsg('كلمتا المرور غير متطابقتين');
+    btn.disabled = true; lockMsg('جاري تجهيز الخزنة…', true);
+    try {
+      const salt = crypto.getRandomValues(new Uint8Array(16));
+      const key = await deriveKey(pw, salt, ITER);
+      const { iv, ct } = await encJSON(key, { v: 'khaznati' });
+      await cfgSet('vault', { salt, iter: ITER, viv: iv, vct: ct });
+      KEY = key; await enterApp();
+    } finally { btn.disabled = false; }
+    return;
+  }
+  const f = (await cfgGet('fails')) || { n: 0, t: 0 };
+  const wait = f.n >= 5 ? Math.min(3600, 30 * 2 ** (f.n - 5)) * 1000 - (Date.now() - f.t) : 0;
+  if (wait > 0) return lockMsg(`محاولات خاطئة كثيرة. انتظر ${Math.ceil(wait / 1000)} ثانية`);
+  btn.disabled = true; lockMsg('جاري التحقق…', true);
+  try {
+    const key = await deriveKey(pw, v.salt, v.iter);
+    await decJSON(key, v.viv, v.vct);
+    await cfgSet('fails', { n: 0, t: 0 });
+    KEY = key; await enterApp();
+  } catch {
+    await cfgSet('fails', { n: f.n + 1, t: Date.now() });
+    lockMsg('كلمة المرور غير صحيحة');
+  } finally { btn.disabled = false; }
+};
+
+$('#forgot').onclick = async () => {
+  if (!confirm('ما فيه طريقة لاسترجاع كلمة المرور لأن الملفات مشفّرة بها.\n\nتبغى تحذف الخزنة بكل ملفاتها من هذا الجهاز وتبدأ من جديد؟')) return;
+  if (!confirm('تأكيد أخير: سيتم حذف كل الملفات نهائيًا. متأكد؟')) return;
+  await wipe();
+};
+
+async function enterApp() {
+  $('#pw1').value = ''; $('#pw2').value = '';
+  $('#lock').hidden = true; $('#app').hidden = false;
+  lastActive = Date.now();
+  try { await navigator.storage?.persist?.(); } catch {}
+  $('#grid').innerHTML = ''; $('#empty').hidden = false; $('#empty').textContent = 'جاري فتح الخزنة…';
+  await loadItems(); render();
+}
+
+function lock() {
+  KEY = null; closeViewer();
+  $('#settings').hidden = true; $('#pwModal').hidden = true;
+  items.forEach(it => it.thumb && URL.revokeObjectURL(it.thumb));
+  items = []; $('#grid').innerHTML = '';
+  initLock();
+}
+
+/* ---------- تحميل وعرض ---------- */
+async function loadItems() {
+  const recs = await P(store('meta').getAll());
+  const out = [];
+  for (const r of recs) {
+    try {
+      const m = await decJSON(KEY, r.iv, r.ct);
+      let thumb = null;
+      if (r.tct) thumb = URL.createObjectURL(new Blob([await decryptBuf(KEY, r.tiv, r.tct)], { type: 'image/jpeg' }));
+      out.push({ id: r.id, ...m, thumb });
+    } catch (e) { console.warn('تعذر فك عنصر', r.id); }
+  }
+  out.sort((a, b) => b.added - a.added);
+  items = out;
+}
+
+const visible = () => items.filter(it => (filter === 'all' || kind(it.type) === filter) && (!query || it.name.toLowerCase().includes(query)));
+
+function render() {
+  const list = visible(), g = $('#grid');
+  g.innerHTML = '';
+  $('#empty').hidden = list.length > 0;
+  $('#empty').textContent = items.length ? 'ما فيه نتائج' : 'خزنتك فاضية.\nاضغط «إضافة» تحت لحفظ صورك وملفاتك.';
+  $('#empty').style.whiteSpace = 'pre-line';
+  const frag = document.createDocumentFragment();
+  for (const it of list) {
+    const c = document.createElement('button'); c.className = 'card'; c.onclick = () => openViewer(it.id);
+    if (it.thumb) { const im = document.createElement('img'); im.src = it.thumb; im.alt = ''; im.loading = 'lazy'; c.append(im); }
+    else { const ic = document.createElement('div'); ic.className = 'ic'; ic.textContent = ext(it.name); c.append(ic); }
+    if (kind(it.type) === 'vid') { const p = document.createElement('span'); p.className = 'play'; p.textContent = '▶ فيديو'; c.append(p); }
+    const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = it.name; c.append(cap);
+    frag.append(c);
+  }
+  g.append(frag);
+  const total = items.reduce((s, x) => s + (x.size || 0), 0);
+  $('#count').textContent = `${items.length} عنصر · ${fmt(total)}`;
+}
+
+$('#tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
+$('#q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); };
+
+/* ---------- إضافة ملفات ---------- */
+async function imageThumb(file) {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = new Image(); img.src = url; await img.decode();
+    return await toThumb(img, img.naturalWidth, img.naturalHeight);
+  } catch { return null; } finally { URL.revokeObjectURL(url); }
+}
+async function toThumb(src, w, h) {
+  if (!w || !h) return null;
+  const s = Math.min(1, 360 / Math.max(w, h)), c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(w * s)); c.height = Math.max(1, Math.round(h * s));
+  c.getContext('2d').drawImage(src, 0, 0, c.width, c.height);
+  const b = await new Promise(r => c.toBlob(r, 'image/jpeg', 0.75));
+  return b ? await b.arrayBuffer() : null;
+}
+function videoThumb(file) {
+  return new Promise(res => {
+    const url = URL.createObjectURL(file), v = document.createElement('video');
+    let fin = false;
+    const end = x => { if (fin) return; fin = true; URL.revokeObjectURL(url); v.removeAttribute('src'); v.load(); res(x); };
+    setTimeout(() => end(null), 6000);
+    v.muted = true; v.playsInline = true; v.preload = 'auto';
+    v.onloadeddata = () => { try { v.currentTime = Math.min(0.5, (v.duration || 1) / 2); } catch { end(null); } };
+    v.onseeked = async () => { try { end(await toThumb(v, v.videoWidth, v.videoHeight)); } catch { end(null); } };
+    v.onerror = () => end(null);
+    v.src = url;
+  });
+}
+
+async function addFiles(files) {
+  files = [...files]; if (!files.length) return;
+  const big = files.filter(f => f.size > 300 * 1024 * 1024);
+  if (big.length && !confirm(`فيه ${big.length} ملف حجمه أكبر من 300 م.ب. الملفات الكبيرة جدًا ممكن تكون بطيئة على الجوال. أكمل؟`)) return;
+  busy++; let ok = 0;
+  try {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      toast(`جاري التشفير والحفظ ${i + 1} من ${files.length}…`, 0);
+      try {
+        const type = f.type || guessType(f.name);
+        const buf = await f.arrayBuffer();
+        const th = kind(type) === 'img' ? await imageThumb(f) : kind(type) === 'vid' ? await videoThumb(f) : null;
+        const id = newId();
+        const meta = { name: f.name, type, size: f.size, added: Date.now() };
+        const m = await encJSON(KEY, meta), d = await encryptBuf(KEY, buf), t = th ? await encryptBuf(KEY, th) : null;
+        const tr = db.transaction(['meta', 'blobs'], 'readwrite');
+        tr.objectStore('meta').put({ id, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
+        tr.objectStore('blobs').put({ id, iv: d.iv, ct: d.ct });
+        await done(tr);
+        items.unshift({ id, ...meta, thumb: th ? URL.createObjectURL(new Blob([th], { type: 'image/jpeg' })) : null });
+        ok++; render();
+      } catch (e) {
+        console.error(e);
+        toast(e && e.name === 'QuotaExceededError' ? 'المساحة المتاحة للمتصفح امتلأت' : `تعذّر حفظ ${f.name}`, 0);
+        await sleep(1800);
+      }
+    }
+    toast(`تم حفظ ${ok} من ${files.length} ✓`);
+  } finally { busy--; lastActive = Date.now(); }
+}
+$('#picker').onchange = e => { const fs = e.target.files; addFiles(fs).finally(() => e.target.value = ''); };
+// سحب وإفلات على الكمبيوتر
+addEventListener('dragover', e => { if (KEY) e.preventDefault(); });
+addEventListener('drop', e => { if (!KEY) return; e.preventDefault(); addFiles(e.dataTransfer.files); });
+
+/* ---------- العارض ---------- */
+async function openViewer(id) {
+  viewList = visible(); viewIdx = viewList.findIndex(x => x.id === id);
+  if (viewIdx < 0) return;
+  $('#viewer').hidden = false; await showView();
+}
+function clearView() {
+  const m = $('#vBody').querySelector('video,audio'); if (m) m.pause();
+  if (viewUrl) URL.revokeObjectURL(viewUrl); viewUrl = null; viewBlob = null;
+  $('#vBody').innerHTML = '';
+}
+async function showView() {
+  const it = viewList[viewIdx], tok = ++viewToken;
+  clearView();
+  $('#vPrev').hidden = viewIdx <= 0; $('#vNext').hidden = viewIdx >= viewList.length - 1;
+  $('#vName').textContent = it.name;
+  $('#vInfo').textContent = `${fmt(it.size)} · ${new Date(it.added).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn')}`;
+  const box = $('#vBody');
+  box.innerHTML = '<div class="spin">جاري فك التشفير…</div>';
+  try {
+    const r = await P(store('blobs').get(it.id));
+    const buf = await decryptBuf(KEY, r.iv, r.ct);
+    if (tok !== viewToken) return;
+    viewBlob = new Blob([buf], { type: it.type || 'application/octet-stream' });
+    viewUrl = URL.createObjectURL(viewBlob);
+    box.innerHTML = '';
+    let el; const k = kind(it.type);
+    if (k === 'img') { el = new Image(); el.src = viewUrl; el.alt = it.name; el.onerror = () => { box.innerHTML = '<div class="nofmt">المتصفح ما يقدر يعرض هذي الصورة هنا. استخدم «تنزيل» أو «مشاركة».</div>'; }; }
+    else if (k === 'vid') { el = document.createElement('video'); el.controls = true; el.playsInline = true; el.src = viewUrl; }
+    else if (it.type.startsWith('audio/')) { el = document.createElement('audio'); el.controls = true; el.src = viewUrl; }
+    else if (it.type === 'application/pdf' || it.type.startsWith('text/')) { el = document.createElement('iframe'); el.src = viewUrl; }
+    else { el = document.createElement('div'); el.className = 'nofmt'; el.textContent = 'ما يقدر المتصفح يعرض هذا النوع من الملفات. اضغط «تنزيل» لفتحه.'; }
+    box.append(el);
+  } catch (e) { if (tok === viewToken) box.innerHTML = '<div class="nofmt">تعذّر فتح الملف</div>'; }
+}
+function closeViewer() { viewToken++; clearView(); $('#viewer').hidden = true; }
+const step = d => { const n = viewIdx + d; if (n >= 0 && n < viewList.length) { viewIdx = n; showView(); } };
+$('#vClose').onclick = closeViewer;
+$('#vNext').onclick = () => step(1);
+$('#vPrev').onclick = () => step(-1);
+addEventListener('keydown', e => {
+  if ($('#viewer').hidden) return;
+  if (e.key === 'Escape') closeViewer();
+  else if (e.key === 'ArrowLeft') step(1);
+  else if (e.key === 'ArrowRight') step(-1);
+});
+let tx0 = null;
+$('#vBody').addEventListener('touchstart', e => { tx0 = e.touches.length === 1 ? e.touches[0].clientX : null; }, { passive: true });
+$('#vBody').addEventListener('touchend', e => { if (tx0 == null) return; const dx = e.changedTouches[0].clientX - tx0; if (Math.abs(dx) > 60) step(dx > 0 ? 1 : -1); tx0 = null; });
+
+$('#vDown').onclick = () => { if (viewBlob) download(viewBlob, viewList[viewIdx].name); };
+$('#vShare').onclick = async () => {
+  if (!viewBlob) return;
+  const it = viewList[viewIdx], file = new File([viewBlob], it.name, { type: viewBlob.type });
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try { busy++; await navigator.share({ files: [file] }); } catch {} finally { busy--; lastActive = Date.now(); }
+  } else download(viewBlob, it.name);
+};
+$('#vDel').onclick = async () => {
+  const it = viewList[viewIdx];
+  if (!confirm(`حذف «${it.name}» نهائيًا؟`)) return;
+  const tr = db.transaction(['meta', 'blobs'], 'readwrite');
+  tr.objectStore('meta').delete(it.id); tr.objectStore('blobs').delete(it.id);
+  await done(tr);
+  if (it.thumb) URL.revokeObjectURL(it.thumb);
+  items = items.filter(x => x.id !== it.id); viewList.splice(viewIdx, 1);
+  render(); toast('تم الحذف');
+  if (!viewList.length) return closeViewer();
+  viewIdx = Math.min(viewIdx, viewList.length - 1); showView();
+};
+
+/* ---------- الإعدادات ---------- */
+$('#setBtn').onclick = async () => {
+  $('#settings').hidden = false;
+  try {
+    const e = await navigator.storage.estimate();
+    const pers = await navigator.storage.persisted?.();
+    $('#storeInfo').textContent = `المستخدم: ${fmt(e.usage || 0)} من حوالي ${fmt(e.quota || 0)} متاحة للمتصفح${pers ? ' · التخزين محمي من الحذف التلقائي ✓' : ''}`;
+    $('#storeBar').style.width = Math.min(100, (e.usage / e.quota) * 100 || 0) + '%';
+  } catch { $('#storeInfo').textContent = ''; }
+};
+$('#setClose').onclick = () => $('#settings').hidden = true;
+$('#settings').onclick = e => { if (e.target.id === 'settings') $('#settings').hidden = true; };
+$('#lockNow').onclick = lock;
+
+function askPassword(title, text) {
+  return new Promise(res => {
+    $('#pwTitle').textContent = title; $('#pwText').textContent = text; $('#pwIn').value = '';
+    $('#pwModal').hidden = false; setTimeout(() => $('#pwIn').focus(), 50);
+    const fin = v => { $('#pwModal').hidden = true; $('#pwForm').onsubmit = null; $('#pwCancel').onclick = null; res(v); };
+    $('#pwForm').onsubmit = e => { e.preventDefault(); const v = $('#pwIn').value; $('#pwIn').value = ''; fin(v); };
+    $('#pwCancel').onclick = () => fin(null);
+  });
+}
+
+$('#exportBtn').onclick = async () => {
+  busy++;
+  try {
+    toast('جاري تجهيز النسخة الاحتياطية…', 0);
+    const v = await cfgGet('vault');
+    const metas = await P(store('meta').getAll());
+    const head = enc.encode(JSON.stringify({ salt: b64(v.salt), iter: v.iter, viv: b64(v.viv), vct: b64(v.vct), count: metas.length }));
+    const parts = [enc.encode(MAGIC), u32(head.length), head];
+    for (const m of metas) {
+      const bl = await P(store('blobs').get(m.id)); if (!bl) continue;
+      const h = enc.encode(JSON.stringify({ id: m.id, iv: b64(m.iv), tiv: m.tiv ? b64(m.tiv) : null, biv: b64(bl.iv), cl: m.ct.byteLength, tl: m.tct ? m.tct.byteLength : 0, bl: bl.ct.byteLength }));
+      parts.push(u32(h.length), h, m.ct); if (m.tct) parts.push(m.tct); parts.push(bl.ct);
+    }
+    const blob = new Blob(parts, { type: 'application/octet-stream' });
+    download(blob, `khaznati-backup-${new Date().toISOString().slice(0, 10)}.vault`);
+    toast(`تم تجهيز نسخة فيها ${metas.length} عنصر ✓ (مشفّرة بكلمة مرورك)`, 4000);
+  } catch (e) { console.error(e); toast('تعذّر أخذ النسخة الاحتياطية'); }
+  finally { busy--; lastActive = Date.now(); }
+};
+
+$('#importPicker').onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ''; if (!file) return;
+  busy++;
+  try {
+    const buf = await file.arrayBuffer(), u = new Uint8Array(buf);
+    if (dec.decode(u.subarray(0, 5)) !== MAGIC) throw new Error('الملف مو نسخة احتياطية من خزنتي');
+    let o = 5;
+    const rd = () => { const n = new DataView(buf, o, 4).getUint32(0, true); o += 4; const j = JSON.parse(dec.decode(u.subarray(o, o + n))); o += n; return j; };
+    const head = rd();
+    const pw = await askPassword('كلمة مرور النسخة الاحتياطية', 'اكتب كلمة المرور اللي كانت على الخزنة وقت ما أخذت النسخة.');
+    if (pw == null) return;
+    toast('جاري التحقق…', 0);
+    const bk = await deriveKey(pw, unb64(head.salt), head.iter);
+    try { await decJSON(bk, unb64(head.viv), unb64(head.vct)); } catch { toast('كلمة مرور النسخة غير صحيحة'); return; }
+    const have = new Set(items.map(x => x.id)); let n = 0, added = 0;
+    while (o < u.length) {
+      const h = rd();
+      const ct = buf.slice(o, o + h.cl); o += h.cl;
+      const tct = h.tl ? buf.slice(o, o + h.tl) : null; o += h.tl;
+      const bct = buf.slice(o, o + h.bl); o += h.bl;
+      n++; toast(`جاري الاستيراد ${n} من ${head.count}…`, 0);
+      if (have.has(h.id)) continue;
+      const meta = await decJSON(bk, unb64(h.iv), ct);
+      const th = tct ? await decryptBuf(bk, unb64(h.tiv), tct) : null;
+      const data = await decryptBuf(bk, unb64(h.biv), bct);
+      const m = await encJSON(KEY, meta), t = th ? await encryptBuf(KEY, th) : null, d = await encryptBuf(KEY, data);
+      const tr = db.transaction(['meta', 'blobs'], 'readwrite');
+      tr.objectStore('meta').put({ id: h.id, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
+      tr.objectStore('blobs').put({ id: h.id, iv: d.iv, ct: d.ct });
+      await done(tr);
+      items.push({ id: h.id, ...meta, thumb: th ? URL.createObjectURL(new Blob([th], { type: 'image/jpeg' })) : null });
+      added++;
+    }
+    items.sort((a, b) => b.added - a.added); render();
+    toast(`تم استيراد ${added} عنصر جديد ✓`, 4000);
+  } catch (e) { console.error(e); toast('تعذّر الاستيراد: ' + (e.message || e), 4000); }
+  finally { busy--; lastActive = Date.now(); }
+};
+
+async function wipe() {
+  KEY = null; items = [];
+  db.close();
+  await new Promise(r => { const q = indexedDB.deleteDatabase('khaznati'); q.onsuccess = q.onerror = q.onblocked = () => r(); });
+  location.reload();
+}
+$('#wipeBtn').onclick = async () => {
+  const pw = await askPassword('حذف الخزنة بالكامل', 'سيتم حذف كل الصور والملفات من هذا الجهاز نهائيًا. للتأكيد اكتب كلمة المرور.');
+  if (pw == null) return;
+  const v = await cfgGet('vault');
+  try { await decJSON(await deriveKey(pw, v.salt, v.iter), v.viv, v.vct); } catch { return toast('كلمة المرور غير صحيحة'); }
+  if (confirm('متأكد؟ ما يمكن التراجع.')) await wipe();
+};
+
+/* ---------- القفل التلقائي والخصوصية ---------- */
+['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(ev => addEventListener(ev, () => lastActive = Date.now(), { passive: true }));
+setInterval(() => { if (KEY && !busy && Date.now() - lastActive > LOCK_MS) lock(); }, 10000);
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = Date.now(); document.body.classList.add('veil'); }
+  else {
+    document.body.classList.remove('veil');
+    if (KEY && !busy && hiddenAt && Date.now() - hiddenAt > HIDDEN_LOCK_MS) lock();
+  }
+});
+
+/* ---------- تشغيل ---------- */
+(async () => {
+  if (!window.crypto?.subtle || !window.indexedDB) {
+    document.body.innerHTML = '<p style="padding:30px;text-align:center">هذا المتصفح ما يدعم التشفير. افتح الموقع من رابط https في Safari أو Chrome.</p>';
+    return;
+  }
+  db = await openDB();
+  await initLock();
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+})();
+</script>
+</body>
+</html>
