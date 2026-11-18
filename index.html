@@ -49,7 +49,7 @@ header h1{font-size:21px;margin:0}
 .tabs button{padding:8px 14px;border-radius:999px;background:var(--panel);color:var(--mute);white-space:nowrap;font-size:14px}
 .tabs button.on{background:var(--acc);color:#fff}
 #q{margin-bottom:12px}
-#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(108px,1fr));gap:6px}
 .card{position:relative;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--panel);display:block;padding:0}
 .card img{width:100%;height:100%;object-fit:cover;display:block}
 .card .ic{position:absolute;inset:0;display:grid;place-items:center;font-weight:700;font-size:15px;color:var(--acc);padding-bottom:22px;text-transform:uppercase}
@@ -80,6 +80,13 @@ header h1{font-size:21px;margin:0}
 .meter{height:8px;background:var(--panel2);border-radius:99px;overflow:hidden}
 .meter i{display:block;height:100%;background:var(--acc);width:0}
 #toast{position:fixed;top:calc(env(safe-area-inset-top) + 12px);left:50%;transform:translateX(-50%);background:#1f2b47;border:1px solid var(--line);padding:10px 16px;border-radius:12px;z-index:50;font-size:14px;max-width:90%;text-align:center;box-shadow:0 8px 24px rgba(0,0,0,.4)}
+.card.folder{background:var(--panel2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:8px}
+.folder .fi{font-size:40px;line-height:1}
+.folder .fn{font-size:13px;font-weight:600;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder .fc{font-size:11px;color:var(--mute)}
+.card.newf{background:transparent;border:1.5px dashed var(--line);color:var(--mute)}
+.sec{color:var(--mute);font-size:13px;margin:14px 2px 8px}
+#backBtn{font-size:22px}
 </style>
 </head>
 <body>
@@ -103,7 +110,9 @@ header h1{font-size:21px;margin:0}
 <!-- التطبيق -->
 <main id="app" hidden>
   <header>
-    <div class="t"><h1>خزنتي</h1><div id="count"></div></div>
+    <button class="ib" id="backBtn" title="رجوع" aria-label="رجوع" hidden>→</button>
+    <div class="t"><h1 id="title">خزنتي</h1><div id="count"></div></div>
+    <button class="ib" id="fMenu" title="خيارات المجلد" aria-label="خيارات المجلد" hidden>⋯</button>
     <button class="ib" id="setBtn" title="الإعدادات" aria-label="الإعدادات">⚙️</button>
     <button class="ib" id="lockNow" title="قفل" aria-label="قفل">🔒</button>
   </header>
@@ -114,7 +123,10 @@ header h1{font-size:21px;margin:0}
     <button data-f="file">الملفات</button>
   </nav>
   <input id="q" class="in" type="search" placeholder="ابحث باسم الملف…">
-  <div id="grid"></div>
+  <div id="fsec" class="sec" hidden>المجلدات</div>
+  <div id="fgrid" class="grid"></div>
+  <div id="isec" class="sec" hidden>الملفات</div>
+  <div id="grid" class="grid"></div>
   <div id="empty" hidden></div>
   <label class="fab"><span>＋</span> إضافة<input id="picker" type="file" multiple hidden></label>
 </main>
@@ -124,6 +136,7 @@ header h1{font-size:21px;margin:0}
   <div class="vbar">
     <button class="ib" id="vClose" aria-label="إغلاق">✕</button>
     <div class="t"><div id="vName"></div><div id="vInfo"></div></div>
+    <button class="ib" id="vMove" aria-label="نقل لمجلد">📁</button>
     <button class="ib" id="vShare" aria-label="مشاركة أو حفظ">⤴︎</button>
     <button class="ib" id="vDown" aria-label="تنزيل">⬇︎</button>
     <button class="ib" id="vDel" aria-label="حذف">🗑</button>
@@ -142,20 +155,29 @@ header h1{font-size:21px;margin:0}
     <p>كل ملفاتك مشفّرة (AES-256) ومحفوظة على هذا الجهاز فقط. ما تنرسل لأي سيرفر.</p>
     <button class="btn ghost" id="exportBtn">📦 أخذ نسخة احتياطية مشفّرة</button>
     <label class="btn ghost" style="text-align:center">📥 استيراد نسخة احتياطية<input id="importPicker" type="file" accept=".vault,application/octet-stream" hidden></label>
-    <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز.</p>
+    <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز. المجلدات المقفلة تنتقل بأرقامها السرية.</p>
     <button class="btn danger" id="wipeBtn">حذف الخزنة بالكامل من هذا الجهاز</button>
     <button class="btn" id="setClose">تم</button>
   </div>
 </div>
 
-<!-- نافذة كلمة المرور -->
-<div class="ov" id="pwModal" hidden>
-  <form class="sheet" id="pwForm" autocomplete="off">
-    <h2 id="pwTitle"></h2>
-    <p id="pwText"></p>
-    <input id="pwIn" class="in" type="password" placeholder="كلمة المرور">
+<!-- قائمة خيارات -->
+<div class="ov" id="act" hidden>
+  <div class="sheet">
+    <h2 id="actTitle"></h2>
+    <div id="actList" style="display:grid;gap:8px"></div>
+    <button class="btn" id="actCancel">إلغاء</button>
+  </div>
+</div>
+
+<!-- نافذة إدخال -->
+<div class="ov" id="askModal" hidden>
+  <form class="sheet" id="askForm" autocomplete="off">
+    <h2 id="askTitle"></h2>
+    <p id="askText"></p>
+    <input id="askIn" class="in">
     <button class="btn" type="submit">متابعة</button>
-    <button class="btn ghost" type="button" id="pwCancel">إلغاء</button>
+    <button class="btn ghost" type="button" id="askCancel">إلغاء</button>
   </form>
 </div>
 
@@ -167,6 +189,7 @@ const $ = s => document.querySelector(s);
 const enc = new TextEncoder(), dec = new TextDecoder();
 const ITER = 310000, MAGIC = 'KHZN1', LOCK_MS = 5 * 60 * 1000, HIDDEN_LOCK_MS = 60 * 1000;
 let db = null, KEY = null, items = [], filter = 'all', query = '', busy = 0;
+let folders = [], cur = null, fkeys = new Map(), counts = new Map(), pinFails = new Map();
 let lastActive = Date.now(), hiddenAt = 0, viewList = [], viewIdx = -1, viewUrl = null, viewBlob = null, viewToken = 0;
 
 /* ---------- أدوات ---------- */
@@ -180,8 +203,10 @@ const ext = n => (n.includes('.') ? n.split('.').pop() : 'ملف').slice(0, 5);
 const kind = t => t.startsWith('image/') ? 'img' : t.startsWith('video/') ? 'vid' : 'file';
 const TYPES = { jpg:'image/jpeg', jpeg:'image/jpeg', png:'image/png', gif:'image/gif', webp:'image/webp', heic:'image/heic', heif:'image/heif', mp4:'video/mp4', mov:'video/quicktime', m4v:'video/mp4', webm:'video/webm', mp3:'audio/mpeg', m4a:'audio/mp4', wav:'audio/wav', pdf:'application/pdf', txt:'text/plain' };
 const guessType = n => TYPES[ext(n).toLowerCase()] || 'application/octet-stream';
+const byDate = (a, b) => b.added - a.added;
 let toastT;
 function toast(msg, ms = 2600) { const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastT); if (ms) toastT = setTimeout(() => t.hidden = true, ms); }
+const hideToast = () => { $('#toast').hidden = true; };
 function download(blob, name) { const u = URL.createObjectURL(blob); const a = document.createElement('a'); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000); }
 
 /* ---------- قاعدة البيانات المحلية ---------- */
@@ -207,6 +232,205 @@ async function encryptBuf(key, buf) { const iv = crypto.getRandomValues(new Uint
 const decryptBuf = (key, iv, ct) => crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
 const encJSON = (k, o) => encryptBuf(k, enc.encode(JSON.stringify(o)));
 const decJSON = async (k, iv, ct) => JSON.parse(dec.decode(await decryptBuf(k, iv, ct)));
+async function pinMaterial(pin) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveKey(pin, salt, ITER);
+  const { iv, ct } = await encJSON(key, { v: 'folder' });
+  return { key, salt, viv: iv, vct: new Uint8Array(ct) };
+}
+
+/* ---------- المجلدات ---------- */
+const folder = id => id ? folders.find(f => f.id === id) : null;
+const effFid = fid => (fid && folder(fid)) ? fid : null;
+// المفتاح المستخدم لتشفير ملفات مكان معيّن (الرئيسية أو مجلد)
+function keyFor(fid) { const f = folder(fid); if (!f) return KEY; return f.locked ? (fkeys.get(f.id) || null) : KEY; }
+const bump = (fid, d) => counts.set(fid || null, Math.max(0, (counts.get(fid || null) || 0) + d));
+
+async function loadFolders() {
+  const r = await cfgGet('folders');
+  folders = r ? (await decJSON(KEY, r.iv, r.ct)).map(fromPlain) : [];
+}
+const fromPlain = f => ({ ...f, salt: f.salt ? unb64(f.salt) : null, viv: f.viv ? unb64(f.viv) : null, vct: f.vct ? unb64(f.vct) : null });
+const toPlain = f => ({ id: f.id, name: f.name, locked: !!f.locked, created: f.created, salt: f.salt ? b64(f.salt) : null, viv: f.viv ? b64(f.viv) : null, vct: f.vct ? b64(f.vct) : null });
+const foldersRec = () => encJSON(KEY, folders.map(toPlain));
+async function saveFolders() { await cfgSet('folders', await foldersRec()); }
+
+async function unlockFolder(f) {
+  const pf = pinFails.get(f.id) || { n: 0, t: 0 };
+  const wait = pf.n >= 5 ? Math.min(3600, 30 * 2 ** (pf.n - 5)) * 1000 - (Date.now() - pf.t) : 0;
+  if (wait > 0) { toast(`محاولات خاطئة كثيرة. انتظر ${Math.ceil(wait / 1000)} ثانية`); return null; }
+  const pin = await ask({ title: `🔒 ${f.name}`, text: 'اكتب الرقم السري للمجلد', type: 'password', num: true, ph: 'الرقم السري' });
+  if (pin == null) return null;
+  toast('جاري التحقق…', 0);
+  try {
+    const k = await deriveKey(pin, f.salt, ITER);
+    await decJSON(k, f.viv, f.vct);
+    pinFails.delete(f.id); hideToast();
+    return k;
+  } catch {
+    pinFails.set(f.id, { n: pf.n + 1, t: Date.now() });
+    toast('الرقم السري غير صحيح');
+    return null;
+  }
+}
+async function askNewPin(title = 'رقم سري للمجلد') {
+  const p1 = await ask({ title, text: 'اختر رقم سري من 4 أرقام أو أكثر. إذا نسيته ما يمكن فتح ملفات المجلد.', type: 'password', num: true, ph: 'الرقم السري' });
+  if (p1 == null) return null;
+  if (p1.length < 4) { toast('الرقم السري لازم 4 أرقام على الأقل'); return null; }
+  const p2 = await ask({ title: 'تأكيد الرقم السري', text: 'اكتبه مرة ثانية', type: 'password', num: true, ph: 'الرقم السري' });
+  if (p2 == null) return null;
+  if (p1 !== p2) { toast('الرقمين غير متطابقين'); return null; }
+  return p1;
+}
+
+async function openFolder(fid) {
+  const f = folder(fid); if (!f) return;
+  if (f.locked && !fkeys.has(fid)) {
+    const k = await unlockFolder(f); if (!k) return;
+    fkeys.set(fid, k);
+    const recs = (await P(store('meta').getAll())).filter(r => r.fid === fid);
+    for (const r of recs) { try { items.push(await decRec(r, k)); } catch {} }
+    items.sort(byDate);
+  }
+  cur = fid; $('#q').value = ''; query = '';
+  render(); scrollTo(0, 0);
+}
+function leaveFolder() {
+  if (busy) return toast('انتظر لين ينتهي الحفظ');
+  const f = folder(cur);
+  if (f && f.locked) {
+    items = items.filter(it => { if (it.fid === cur) { if (it.thumb) URL.revokeObjectURL(it.thumb); return false; } return true; });
+    fkeys.delete(cur);
+  }
+  cur = null; $('#q').value = ''; query = '';
+  render(); scrollTo(0, 0);
+}
+
+async function createFolder() {
+  const name = (await ask({ title: 'مجلد جديد', text: 'اكتب اسم المجلد', ph: 'مثال: صور العائلة' }) || '').trim();
+  if (!name) return;
+  const f = { id: newId(), name, locked: false, created: Date.now(), salt: null, viv: null, vct: null };
+  if (await choose(`تبغى تحط رقم سري لمجلد «${name}»؟`, [{ l: '🔒 نعم، بحط رقم سري', v: true }, { l: '📁 لا، مجلد عادي', v: false }])) {
+    const pin = await askNewPin(); if (!pin) return;
+    toast('جاري التجهيز…', 0);
+    const m = await pinMaterial(pin);
+    Object.assign(f, { locked: true, salt: m.salt, viv: m.viv, vct: m.vct });
+    fkeys.set(f.id, m.key);
+  }
+  folders.push(f); await saveFolders();
+  toast('تم إنشاء المجلد ✓');
+  cur = f.id; render();
+}
+
+// إعادة تشفير كل ملفات مجلد بمفتاح جديد — كلها في عملية وحدة عشان ما تنكسر لو انقطعت
+async function rekeyFolder(fid, oldKey, newKey, patch) {
+  busy++;
+  try {
+    toast('جاري إعادة تشفير ملفات المجلد…', 0);
+    const recs = (await P(store('meta').getAll())).filter(r => r.fid === fid);
+    const mOut = [], bOut = [];
+    for (const r of recs) {
+      const b = await P(store('blobs').get(r.id));
+      const m = await encryptBuf(newKey, await decryptBuf(oldKey, r.iv, r.ct));
+      const t = r.tct ? await encryptBuf(newKey, await decryptBuf(oldKey, r.tiv, r.tct)) : null;
+      const d = await encryptBuf(newKey, await decryptBuf(oldKey, b.iv, b.ct));
+      mOut.push({ id: r.id, fid, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
+      bOut.push({ id: r.id, iv: d.iv, ct: d.ct });
+    }
+    const f = folder(fid), before = { ...f };
+    Object.assign(f, patch);
+    try {
+      const frec = await foldersRec();
+      const tr = db.transaction(['meta', 'blobs', 'config'], 'readwrite');
+      mOut.forEach(x => tr.objectStore('meta').put(x));
+      bOut.forEach(x => tr.objectStore('blobs').put(x));
+      tr.objectStore('config').put(frec, 'folders');
+      await done(tr);
+    } catch (e) { Object.assign(f, before); throw e; }
+    if (f.locked) fkeys.set(fid, newKey); else fkeys.delete(fid);
+  } finally { busy--; lastActive = Date.now(); }
+}
+
+function folderMenu() {
+  const f = folder(cur); if (!f) return;
+  actions(f.name, [
+    { l: '✏️ تغيير الاسم', fn: renameFolder },
+    { l: f.locked ? '🔑 تغيير الرقم السري' : '🔒 إضافة رقم سري', fn: () => setPin(true) },
+    f.locked && { l: '🔓 إزالة الرقم السري', fn: () => setPin(false) },
+    { l: '🗑 حذف المجلد', fn: deleteFolder, danger: true },
+  ].filter(Boolean));
+}
+async function renameFolder() {
+  const f = folder(cur);
+  const name = (await ask({ title: 'تغيير اسم المجلد', value: f.name }) || '').trim();
+  if (!name || name === f.name) return;
+  f.name = name; await saveFolders(); render();
+}
+async function setPin(on) {
+  const fid = cur, f = folder(fid), oldKey = keyFor(fid);
+  try {
+    if (on) {
+      const pin = await askNewPin(f.locked ? 'الرقم السري الجديد' : 'رقم سري للمجلد'); if (!pin) return;
+      toast('جاري التجهيز…', 0);
+      const m = await pinMaterial(pin);
+      await rekeyFolder(fid, oldKey, m.key, { locked: true, salt: m.salt, viv: m.viv, vct: m.vct });
+      toast(f.locked ? 'تم حفظ الرقم السري ✓' : 'تم ✓');
+    } else {
+      if (!confirm(`إزالة الرقم السري من «${f.name}»؟ ملفاته بتكون محمية بكلمة مرور الخزنة فقط.`)) return;
+      await rekeyFolder(fid, oldKey, KEY, { locked: false, salt: null, viv: null, vct: null });
+      toast('تمت إزالة الرقم السري ✓');
+    }
+    render();
+  } catch (e) { console.error(e); toast('تعذّر تنفيذ العملية، ما تغيّر شي'); }
+}
+async function deleteFolder() {
+  const fid = cur, f = folder(fid);
+  const n = items.filter(it => it.fid === fid).length;
+  if (!confirm(n ? `حذف مجلد «${f.name}» مع ${n} ملف داخله نهائيًا؟` : `حذف مجلد «${f.name}»؟`)) return;
+  if (n && !confirm('تأكيد أخير: الملفات بتنحذف نهائيًا. متأكد؟')) return;
+  const ids = (await P(store('meta').getAll())).filter(r => r.fid === fid).map(r => r.id);
+  const idx = folders.indexOf(f); folders.splice(idx, 1);
+  try {
+    const frec = await foldersRec();
+    const tr = db.transaction(['meta', 'blobs', 'config'], 'readwrite');
+    ids.forEach(id => { tr.objectStore('meta').delete(id); tr.objectStore('blobs').delete(id); });
+    tr.objectStore('config').put(frec, 'folders');
+    await done(tr);
+  } catch (e) { folders.splice(idx, 0, f); return toast('تعذّر حذف المجلد'); }
+  items = items.filter(it => { if (it.fid === fid) { if (it.thumb) URL.revokeObjectURL(it.thumb); return false; } return true; });
+  fkeys.delete(fid); counts.delete(fid); cur = null;
+  render(); toast('تم حذف المجلد');
+}
+
+/* ---------- نوافذ ---------- */
+function ask({ title, text = '', type = 'text', ph = '', value = '', num = false }) {
+  return new Promise(res => {
+    const i = $('#askIn');
+    $('#askTitle').textContent = title; $('#askText').textContent = text; $('#askText').hidden = !text;
+    i.type = type; i.placeholder = ph; i.value = value; i.inputMode = num ? 'numeric' : 'text';
+    $('#askModal').hidden = false; setTimeout(() => i.focus(), 50);
+    const fin = v => { $('#askModal').hidden = true; $('#askForm').onsubmit = null; $('#askCancel').onclick = null; i.value = ''; res(v); };
+    $('#askForm').onsubmit = e => { e.preventDefault(); fin(i.value); };
+    $('#askCancel').onclick = () => fin(null);
+  });
+}
+function actions(title, list) {
+  $('#actTitle').textContent = title;
+  const box = $('#actList'); box.innerHTML = '';
+  for (const a of list) {
+    const b = document.createElement('button'); b.className = 'btn ' + (a.danger ? 'danger' : 'ghost'); b.textContent = a.l;
+    b.onclick = () => { $('#act').hidden = true; a.fn(); };
+    box.append(b);
+  }
+  $('#act').hidden = false;
+}
+function choose(title, opts) {
+  return new Promise(res => {
+    actions(title, opts.map(o => ({ l: o.l, fn: () => res(o.v) })));
+    $('#actCancel').onclick = () => { $('#act').hidden = true; res(null); };
+  });
+}
+$('#actCancel').onclick = () => $('#act').hidden = true;
 
 /* ---------- القفل ---------- */
 async function initLock() {
@@ -269,42 +493,69 @@ async function enterApp() {
   $('#lock').hidden = true; $('#app').hidden = false;
   lastActive = Date.now();
   try { await navigator.storage?.persist?.(); } catch {}
-  $('#grid').innerHTML = ''; $('#empty').hidden = false; $('#empty').textContent = 'جاري فتح الخزنة…';
-  await loadItems(); render();
+  $('#grid').innerHTML = ''; $('#fgrid').innerHTML = ''; $('#empty').hidden = false; $('#empty').textContent = 'جاري فتح الخزنة…';
+  await loadFolders(); await loadItems(); render();
 }
 
 function lock() {
   KEY = null; closeViewer();
-  $('#settings').hidden = true; $('#pwModal').hidden = true;
+  ['#settings', '#askModal', '#act'].forEach(s => $(s).hidden = true);
   items.forEach(it => it.thumb && URL.revokeObjectURL(it.thumb));
-  items = []; $('#grid').innerHTML = '';
+  items = []; folders = []; fkeys.clear(); counts.clear(); cur = null;
+  $('#grid').innerHTML = ''; $('#fgrid').innerHTML = '';
   initLock();
 }
 
 /* ---------- تحميل وعرض ---------- */
+async function decRec(r, key) {
+  const m = await decJSON(key, r.iv, r.ct);
+  let thumb = null;
+  if (r.tct) thumb = URL.createObjectURL(new Blob([await decryptBuf(key, r.tiv, r.tct)], { type: 'image/jpeg' }));
+  return { ...m, id: r.id, fid: r.fid || null, thumb };
+}
 async function loadItems() {
   const recs = await P(store('meta').getAll());
-  const out = [];
+  counts = new Map(); const out = [];
   for (const r of recs) {
-    try {
-      const m = await decJSON(KEY, r.iv, r.ct);
-      let thumb = null;
-      if (r.tct) thumb = URL.createObjectURL(new Blob([await decryptBuf(KEY, r.tiv, r.tct)], { type: 'image/jpeg' }));
-      out.push({ id: r.id, ...m, thumb });
-    } catch (e) { console.warn('تعذر فك عنصر', r.id); }
+    const fid = effFid(r.fid); bump(fid, 1);
+    const k = keyFor(fid); if (!k) continue;
+    try { out.push(await decRec(r, k)); } catch (e) { console.warn('تعذر فك عنصر', r.id); }
   }
-  out.sort((a, b) => b.added - a.added);
-  items = out;
+  items = out.sort(byDate);
 }
 
-const visible = () => items.filter(it => (filter === 'all' || kind(it.type) === filter) && (!query || it.name.toLowerCase().includes(query)));
+const visible = () => items.filter(it => effFid(it.fid) === cur && (filter === 'all' || kind(it.type) === filter) && (!query || it.name.toLowerCase().includes(query)));
 
 function render() {
+  const f = folder(cur);
+  if (cur && !f) cur = null;
+  $('#title').textContent = f ? (f.locked ? '🔒 ' : '📁 ') + f.name : 'خزنتي';
+  $('#backBtn').hidden = !f; $('#fMenu').hidden = !f;
+
+  // المجلدات (في الصفحة الرئيسية فقط)
+  const fg = $('#fgrid'); fg.innerHTML = '';
+  const showF = !f && filter === 'all' && !query;
+  if (showF) {
+    for (const x of [...folders].sort((a, b) => a.name.localeCompare(b.name, 'ar'))) {
+      const c = document.createElement('button'); c.className = 'card folder'; c.onclick = () => openFolder(x.id);
+      const i = document.createElement('div'); i.className = 'fi'; i.textContent = x.locked ? '🔒' : '📁';
+      const n = document.createElement('div'); n.className = 'fn'; n.textContent = x.name;
+      const k = document.createElement('div'); k.className = 'fc'; k.textContent = `${counts.get(x.id) || 0} عنصر`;
+      c.append(i, n, k); fg.append(c);
+    }
+    const nf = document.createElement('button'); nf.className = 'card folder newf'; nf.onclick = createFolder;
+    const i = document.createElement('div'); i.className = 'fi'; i.textContent = '＋';
+    const n = document.createElement('div'); n.className = 'fn'; n.textContent = 'مجلد جديد';
+    nf.append(i, n); fg.append(nf);
+  }
+  $('#fsec').hidden = !showF;
+
   const list = visible(), g = $('#grid');
   g.innerHTML = '';
-  $('#empty').hidden = list.length > 0;
-  $('#empty').textContent = items.length ? 'ما فيه نتائج' : 'خزنتك فاضية.\nاضغط «إضافة» تحت لحفظ صورك وملفاتك.';
-  $('#empty').style.whiteSpace = 'pre-line';
+  $('#isec').hidden = !showF || !list.length;
+  const emptyMsg = query || filter !== 'all' ? 'ما فيه نتائج' : f ? 'المجلد فاضي.\nاضغط «إضافة» تحت لحفظ صور وملفات فيه.' : 'اضغط «إضافة» تحت لحفظ صورك وملفاتك،\nأو أنشئ مجلد لتقسيمها.';
+  $('#empty').hidden = list.length > 0 || (showF && folders.length > 0);
+  $('#empty').textContent = emptyMsg; $('#empty').style.whiteSpace = 'pre-line';
   const frag = document.createDocumentFragment();
   for (const it of list) {
     const c = document.createElement('button'); c.className = 'card'; c.onclick = () => openViewer(it.id);
@@ -315,12 +566,14 @@ function render() {
     frag.append(c);
   }
   g.append(frag);
-  const total = items.reduce((s, x) => s + (x.size || 0), 0);
-  $('#count').textContent = `${items.length} عنصر · ${fmt(total)}`;
+  const here = items.filter(it => effFid(it.fid) === cur);
+  $('#count').textContent = `${here.length} عنصر · ${fmt(here.reduce((s, x) => s + (x.size || 0), 0))}` + (!f && folders.length ? ` · ${folders.length} مجلد` : '');
 }
 
 $('#tabs').onclick = e => { const b = e.target.closest('button'); if (!b) return; filter = b.dataset.f; $('#tabs').querySelectorAll('button').forEach(x => x.classList.toggle('on', x === b)); render(); };
 $('#q').oninput = e => { query = e.target.value.trim().toLowerCase(); render(); };
+$('#backBtn').onclick = leaveFolder;
+$('#fMenu').onclick = folderMenu;
 
 /* ---------- إضافة ملفات ---------- */
 async function imageThumb(file) {
@@ -354,6 +607,8 @@ function videoThumb(file) {
 
 async function addFiles(files) {
   files = [...files]; if (!files.length) return;
+  const fid = cur, key = keyFor(fid);
+  if (!key) return toast('افتح المجلد أول');
   const big = files.filter(f => f.size > 300 * 1024 * 1024);
   if (big.length && !confirm(`فيه ${big.length} ملف حجمه أكبر من 300 م.ب. الملفات الكبيرة جدًا ممكن تكون بطيئة على الجوال. أكمل؟`)) return;
   busy++; let ok = 0;
@@ -367,13 +622,13 @@ async function addFiles(files) {
         const th = kind(type) === 'img' ? await imageThumb(f) : kind(type) === 'vid' ? await videoThumb(f) : null;
         const id = newId();
         const meta = { name: f.name, type, size: f.size, added: Date.now() };
-        const m = await encJSON(KEY, meta), d = await encryptBuf(KEY, buf), t = th ? await encryptBuf(KEY, th) : null;
+        const m = await encJSON(key, meta), d = await encryptBuf(key, buf), t = th ? await encryptBuf(key, th) : null;
         const tr = db.transaction(['meta', 'blobs'], 'readwrite');
-        tr.objectStore('meta').put({ id, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
+        tr.objectStore('meta').put({ id, fid, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
         tr.objectStore('blobs').put({ id, iv: d.iv, ct: d.ct });
         await done(tr);
-        items.unshift({ id, ...meta, thumb: th ? URL.createObjectURL(new Blob([th], { type: 'image/jpeg' })) : null });
-        ok++; render();
+        items.unshift({ id, fid, ...meta, thumb: th ? URL.createObjectURL(new Blob([th], { type: 'image/jpeg' })) : null });
+        bump(fid, 1); ok++; render();
       } catch (e) {
         console.error(e);
         toast(e && e.name === 'QuotaExceededError' ? 'المساحة المتاحة للمتصفح امتلأت' : `تعذّر حفظ ${f.name}`, 0);
@@ -384,7 +639,6 @@ async function addFiles(files) {
   } finally { busy--; lastActive = Date.now(); }
 }
 $('#picker').onchange = e => { const fs = e.target.files; addFiles(fs).finally(() => e.target.value = ''); };
-// سحب وإفلات على الكمبيوتر
 addEventListener('dragover', e => { if (KEY) e.preventDefault(); });
 addEventListener('drop', e => { if (!KEY) return; e.preventDefault(); addFiles(e.dataTransfer.files); });
 
@@ -409,7 +663,7 @@ async function showView() {
   box.innerHTML = '<div class="spin">جاري فك التشفير…</div>';
   try {
     const r = await P(store('blobs').get(it.id));
-    const buf = await decryptBuf(KEY, r.iv, r.ct);
+    const buf = await decryptBuf(keyFor(effFid(it.fid)), r.iv, r.ct);
     if (tok !== viewToken) return;
     viewBlob = new Blob([buf], { type: it.type || 'application/octet-stream' });
     viewUrl = URL.createObjectURL(viewBlob);
@@ -425,11 +679,16 @@ async function showView() {
 }
 function closeViewer() { viewToken++; clearView(); $('#viewer').hidden = true; }
 const step = d => { const n = viewIdx + d; if (n >= 0 && n < viewList.length) { viewIdx = n; showView(); } };
+function afterRemove() {
+  render();
+  if (!viewList.length) return closeViewer();
+  viewIdx = Math.min(viewIdx, viewList.length - 1); showView();
+}
 $('#vClose').onclick = closeViewer;
 $('#vNext').onclick = () => step(1);
 $('#vPrev').onclick = () => step(-1);
 addEventListener('keydown', e => {
-  if ($('#viewer').hidden) return;
+  if ($('#viewer').hidden || !$('#askModal').hidden || !$('#act').hidden) return;
   if (e.key === 'Escape') closeViewer();
   else if (e.key === 'ArrowLeft') step(1);
   else if (e.key === 'ArrowRight') step(-1);
@@ -453,11 +712,39 @@ $('#vDel').onclick = async () => {
   tr.objectStore('meta').delete(it.id); tr.objectStore('blobs').delete(it.id);
   await done(tr);
   if (it.thumb) URL.revokeObjectURL(it.thumb);
-  items = items.filter(x => x.id !== it.id); viewList.splice(viewIdx, 1);
-  render(); toast('تم الحذف');
-  if (!viewList.length) return closeViewer();
-  viewIdx = Math.min(viewIdx, viewList.length - 1); showView();
+  items = items.filter(x => x.id !== it.id); viewList.splice(viewIdx, 1); bump(effFid(it.fid), -1);
+  toast('تم الحذف'); afterRemove();
 };
+$('#vMove').onclick = () => {
+  const it = viewList[viewIdx], from = effFid(it.fid);
+  const opts = [{ id: null, l: '🏠 الصفحة الرئيسية' }, ...folders.map(f => ({ id: f.id, l: (f.locked ? '🔒 ' : '📁 ') + f.name }))].filter(o => o.id !== from);
+  if (!opts.length) return toast('ما عندك مجلدات. أنشئ مجلد من الصفحة الرئيسية أول');
+  actions(`نقل «${it.name}» إلى:`, opts.map(o => ({ l: o.l, fn: () => moveItem(it, o.id) })));
+};
+async function moveItem(it, to) {
+  const from = effFid(it.fid), oldKey = keyFor(from);
+  let newKey = keyFor(to);
+  if (!newKey) { newKey = await unlockFolder(folder(to)); if (!newKey) return; }
+  busy++;
+  try {
+    toast('جاري النقل…', 0);
+    const r = await P(store('meta').get(it.id)), b = await P(store('blobs').get(it.id));
+    const m = await encryptBuf(newKey, await decryptBuf(oldKey, r.iv, r.ct));
+    const t = r.tct ? await encryptBuf(newKey, await decryptBuf(oldKey, r.tiv, r.tct)) : null;
+    const d = await encryptBuf(newKey, await decryptBuf(oldKey, b.iv, b.ct));
+    const tr = db.transaction(['meta', 'blobs'], 'readwrite');
+    tr.objectStore('meta').put({ id: it.id, fid: to, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
+    tr.objectStore('blobs').put({ id: it.id, iv: d.iv, ct: d.ct });
+    await done(tr);
+    it.fid = to; bump(from, -1); bump(to, 1);
+    // إذا المجلد الهدف مقفل ومو مفتوح، نشيل الملف من الذاكرة
+    if (to && folder(to).locked && !fkeys.has(to)) { if (it.thumb) URL.revokeObjectURL(it.thumb); items = items.filter(x => x !== it); }
+    viewList.splice(viewIdx, 1);
+    toast(`تم النقل إلى «${to ? folder(to).name : 'الرئيسية'}» ✓`);
+    afterRemove();
+  } catch (e) { console.error(e); toast('تعذّر النقل'); }
+  finally { busy--; lastActive = Date.now(); }
+}
 
 /* ---------- الإعدادات ---------- */
 $('#setBtn').onclick = async () => {
@@ -473,32 +760,21 @@ $('#setClose').onclick = () => $('#settings').hidden = true;
 $('#settings').onclick = e => { if (e.target.id === 'settings') $('#settings').hidden = true; };
 $('#lockNow').onclick = lock;
 
-function askPassword(title, text) {
-  return new Promise(res => {
-    $('#pwTitle').textContent = title; $('#pwText').textContent = text; $('#pwIn').value = '';
-    $('#pwModal').hidden = false; setTimeout(() => $('#pwIn').focus(), 50);
-    const fin = v => { $('#pwModal').hidden = true; $('#pwForm').onsubmit = null; $('#pwCancel').onclick = null; res(v); };
-    $('#pwForm').onsubmit = e => { e.preventDefault(); const v = $('#pwIn').value; $('#pwIn').value = ''; fin(v); };
-    $('#pwCancel').onclick = () => fin(null);
-  });
-}
-
 $('#exportBtn').onclick = async () => {
   busy++;
   try {
     toast('جاري تجهيز النسخة الاحتياطية…', 0);
-    const v = await cfgGet('vault');
+    const v = await cfgGet('vault'), fr = await cfgGet('folders');
     const metas = await P(store('meta').getAll());
-    const head = enc.encode(JSON.stringify({ salt: b64(v.salt), iter: v.iter, viv: b64(v.viv), vct: b64(v.vct), count: metas.length }));
+    const head = enc.encode(JSON.stringify({ salt: b64(v.salt), iter: v.iter, viv: b64(v.viv), vct: b64(v.vct), count: metas.length, fiv: fr ? b64(fr.iv) : null, fct: fr ? b64(fr.ct) : null }));
     const parts = [enc.encode(MAGIC), u32(head.length), head];
     for (const m of metas) {
       const bl = await P(store('blobs').get(m.id)); if (!bl) continue;
-      const h = enc.encode(JSON.stringify({ id: m.id, iv: b64(m.iv), tiv: m.tiv ? b64(m.tiv) : null, biv: b64(bl.iv), cl: m.ct.byteLength, tl: m.tct ? m.tct.byteLength : 0, bl: bl.ct.byteLength }));
+      const h = enc.encode(JSON.stringify({ id: m.id, fid: m.fid || null, iv: b64(m.iv), tiv: m.tiv ? b64(m.tiv) : null, biv: b64(bl.iv), cl: m.ct.byteLength, tl: m.tct ? m.tct.byteLength : 0, bl: bl.ct.byteLength }));
       parts.push(u32(h.length), h, m.ct); if (m.tct) parts.push(m.tct); parts.push(bl.ct);
     }
-    const blob = new Blob(parts, { type: 'application/octet-stream' });
-    download(blob, `khaznati-backup-${new Date().toISOString().slice(0, 10)}.vault`);
-    toast(`تم تجهيز نسخة فيها ${metas.length} عنصر ✓ (مشفّرة بكلمة مرورك)`, 4000);
+    download(new Blob(parts, { type: 'application/octet-stream' }), `khaznati-backup-${new Date().toISOString().slice(0, 10)}.vault`);
+    toast(`تم تجهيز نسخة فيها ${metas.length} عنصر ✓ (مشفّرة)`, 4000);
   } catch (e) { console.error(e); toast('تعذّر أخذ النسخة الاحتياطية'); }
   finally { busy--; lastActive = Date.now(); }
 };
@@ -512,12 +788,19 @@ $('#importPicker').onchange = async e => {
     let o = 5;
     const rd = () => { const n = new DataView(buf, o, 4).getUint32(0, true); o += 4; const j = JSON.parse(dec.decode(u.subarray(o, o + n))); o += n; return j; };
     const head = rd();
-    const pw = await askPassword('كلمة مرور النسخة الاحتياطية', 'اكتب كلمة المرور اللي كانت على الخزنة وقت ما أخذت النسخة.');
+    const pw = await ask({ title: 'كلمة مرور النسخة الاحتياطية', text: 'اكتب كلمة مرور الخزنة وقت ما أخذت النسخة.', type: 'password', ph: 'كلمة المرور' });
     if (pw == null) return;
     toast('جاري التحقق…', 0);
     const bk = await deriveKey(pw, unb64(head.salt), head.iter);
     try { await decJSON(bk, unb64(head.viv), unb64(head.vct)); } catch { toast('كلمة مرور النسخة غير صحيحة'); return; }
-    const have = new Set(items.map(x => x.id)); let n = 0, added = 0;
+    // دمج المجلدات أولًا
+    const bfs = head.fct ? await decJSON(bk, unb64(head.fiv), unb64(head.fct)) : [];
+    const bmap = new Map(bfs.map(f => [f.id, f]));
+    let newF = 0;
+    for (const bf of bfs) if (!folder(bf.id)) { folders.push(fromPlain(bf)); newF++; }
+    if (newF) await saveFolders();
+    const have = new Set((await P(store('meta').getAll())).map(r => r.id));
+    let n = 0, added = 0, skipped = 0;
     while (o < u.length) {
       const h = rd();
       const ct = buf.slice(o, o + h.cl); o += h.cl;
@@ -525,19 +808,30 @@ $('#importPicker').onchange = async e => {
       const bct = buf.slice(o, o + h.bl); o += h.bl;
       n++; toast(`جاري الاستيراد ${n} من ${head.count}…`, 0);
       if (have.has(h.id)) continue;
-      const meta = await decJSON(bk, unb64(h.iv), ct);
-      const th = tct ? await decryptBuf(bk, unb64(h.tiv), tct) : null;
-      const data = await decryptBuf(bk, unb64(h.biv), bct);
-      const m = await encJSON(KEY, meta), t = th ? await encryptBuf(KEY, th) : null, d = await encryptBuf(KEY, data);
+      const bf = h.fid ? bmap.get(h.fid) : null, cf = folder(h.fid), fid = cf ? cf.id : null;
+      let rec, brec, key = null;
+      if (bf && bf.locked) {
+        // مجلد مقفل: ننسخه مشفّر زي ما هو، بشرط إن رقمه السري نفسه
+        if (!cf || !cf.locked || b64(cf.salt) !== bf.salt) { skipped++; continue; }
+        rec = { id: h.id, fid, iv: unb64(h.iv), ct, tiv: h.tiv ? unb64(h.tiv) : null, tct };
+        brec = { id: h.id, iv: unb64(h.biv), ct: bct };
+        key = fkeys.get(fid) || null;
+      } else {
+        key = keyFor(fid); if (!key) { skipped++; continue; }
+        const m = await encryptBuf(key, await decryptBuf(bk, unb64(h.iv), ct));
+        const t = tct ? await encryptBuf(key, await decryptBuf(bk, unb64(h.tiv), tct)) : null;
+        const d = await encryptBuf(key, await decryptBuf(bk, unb64(h.biv), bct));
+        rec = { id: h.id, fid, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null };
+        brec = { id: h.id, iv: d.iv, ct: d.ct };
+      }
       const tr = db.transaction(['meta', 'blobs'], 'readwrite');
-      tr.objectStore('meta').put({ id: h.id, iv: m.iv, ct: m.ct, tiv: t ? t.iv : null, tct: t ? t.ct : null });
-      tr.objectStore('blobs').put({ id: h.id, iv: d.iv, ct: d.ct });
+      tr.objectStore('meta').put(rec); tr.objectStore('blobs').put(brec);
       await done(tr);
-      items.push({ id: h.id, ...meta, thumb: th ? URL.createObjectURL(new Blob([th], { type: 'image/jpeg' })) : null });
-      added++;
+      if (key) { try { items.push(await decRec(rec, key)); } catch {} }
+      bump(fid, 1); added++;
     }
-    items.sort((a, b) => b.added - a.added); render();
-    toast(`تم استيراد ${added} عنصر جديد ✓`, 4000);
+    items.sort(byDate); render();
+    toast(`تم استيراد ${added} عنصر${newF ? ` و${newF} مجلد` : ''} ✓${skipped ? ` (تم تخطي ${skipped})` : ''}`, 4500);
   } catch (e) { console.error(e); toast('تعذّر الاستيراد: ' + (e.message || e), 4000); }
   finally { busy--; lastActive = Date.now(); }
 };
@@ -549,7 +843,7 @@ async function wipe() {
   location.reload();
 }
 $('#wipeBtn').onclick = async () => {
-  const pw = await askPassword('حذف الخزنة بالكامل', 'سيتم حذف كل الصور والملفات من هذا الجهاز نهائيًا. للتأكيد اكتب كلمة المرور.');
+  const pw = await ask({ title: 'حذف الخزنة بالكامل', text: 'سيتم حذف كل الصور والملفات والمجلدات من هذا الجهاز نهائيًا. للتأكيد اكتب كلمة المرور.', type: 'password', ph: 'كلمة المرور' });
   if (pw == null) return;
   const v = await cfgGet('vault');
   try { await decJSON(await deriveKey(pw, v.salt, v.iter), v.viv, v.vct); } catch { return toast('كلمة المرور غير صحيحة'); }
