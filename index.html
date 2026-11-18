@@ -87,6 +87,7 @@ header h1{font-size:21px;margin:0}
 .card.newf{background:transparent;border:1.5px dashed var(--line);color:var(--mute)}
 .sec{color:var(--mute);font-size:13px;margin:14px 2px 8px}
 #backBtn{font-size:22px}
+.code{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:19px;letter-spacing:1px;text-align:center;background:var(--panel2);border-radius:12px;padding:14px;direction:ltr;user-select:all;-webkit-user-select:all;word-break:break-all}
 </style>
 </head>
 <body>
@@ -155,6 +156,8 @@ header h1{font-size:21px;margin:0}
     <p>كل ملفاتك مشفّرة (AES-256) ومحفوظة على هذا الجهاز فقط. ما تنرسل لأي سيرفر.</p>
     <button class="btn ghost" id="exportBtn">📦 أخذ نسخة احتياطية مشفّرة</button>
     <label class="btn ghost" style="text-align:center">📥 استيراد نسخة احتياطية<input id="importPicker" type="file" accept=".vault,application/octet-stream" hidden></label>
+    <button class="btn ghost" id="recBtn">🔑 مفتاح استرجاع كلمة المرور</button>
+    <p id="recInfo"></p>
     <button class="btn ghost" id="dupBtn">🧹 حذف الصور والفيديوهات المكررة</button>
     <p>الفحص يصير تلقائيًا كل ما تفتح الخزنة أو مجلد مقفل، وهذا الزر لفحص يدوي. يخلي نسخة وحدة من كل ملف.</p>
     <p>استخدم النسخة الاحتياطية لنقل ملفاتك بين الجوال والكمبيوتر، أو لحمايتها لو ضاع الجهاز. المجلدات المقفلة تنتقل بأرقامها السرية.</p>
@@ -181,6 +184,18 @@ header h1{font-size:21px;margin:0}
     <button class="btn" type="submit">متابعة</button>
     <button class="btn ghost" type="button" id="askCancel">إلغاء</button>
   </form>
+</div>
+
+<!-- عرض مفتاح أو كلمة مرور -->
+<div class="ov" id="secModal" hidden>
+  <div class="sheet">
+    <h2 id="secTitle"></h2>
+    <p id="secText"></p>
+    <div id="secVal" class="code"></div>
+    <a class="btn" id="secMail" style="text-align:center;text-decoration:none">📧 إرسال لإيميلي</a>
+    <button class="btn ghost" id="secCopy">📋 نسخ</button>
+    <button class="btn ghost" id="secOk">تم</button>
+  </div>
 </div>
 
 <div id="toast" hidden></div>
@@ -429,11 +444,67 @@ function actions(title, list) {
 }
 function choose(title, opts) {
   return new Promise(res => {
-    actions(title, opts.map(o => ({ l: o.l, fn: () => res(o.v) })));
+    actions(title, opts.map(o => ({ l: o.l, danger: o.danger, fn: () => res(o.v) })));
     $('#actCancel').onclick = () => { $('#act').hidden = true; res(null); };
   });
 }
 $('#actCancel').onclick = () => $('#act').hidden = true;
+
+/* ---------- استرجاع كلمة المرور ---------- */
+const RECOVERY_EMAIL = 'hasem.alg@outlook.com';
+const ALPH = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+function newCode() { const r = crypto.getRandomValues(new Uint8Array(20)); let s = ''; for (const b of r) s += ALPH[b % ALPH.length]; return s.match(/.{4}/g).join('-'); }
+const normCode = c => c.toUpperCase().replace(/[^A-Z0-9]/g, '');
+function showSecret({ title, text, value, mail }) {
+  return new Promise(res => {
+    $('#secTitle').textContent = title; $('#secText').textContent = text; $('#secVal').textContent = value;
+    const m = $('#secMail'); m.hidden = !mail;
+    if (mail) m.href = mail;
+    $('#secCopy').onclick = async () => { try { await navigator.clipboard.writeText(value); toast('تم النسخ ✓'); } catch { toast('ظلّل النص وانسخه يدويًا'); } };
+    $('#secOk').onclick = () => { $('#secModal').hidden = true; $('#secVal').textContent = ''; res(); };
+    $('#secModal').hidden = false;
+  });
+}
+async function setupRecovery(pw) {
+  const code = newCode(), salt = crypto.getRandomValues(new Uint8Array(16));
+  toast('جاري تجهيز المفتاح…', 0);
+  const k = await deriveKey(normCode(code), salt, ITER);
+  const { iv, ct } = await encJSON(k, { pw });
+  await cfgSet('recovery', { salt, iv, ct, at: Date.now() });
+  hideToast();
+  const body = `مفتاح استرجاع كلمة مرور «خزنتي»:\n\n${code}\n\nإذا نسيت كلمة المرور: في شاشة القفل اضغط «نسيت كلمة المرور؟» ثم «عندي مفتاح الاسترجاع» واكتب المفتاح.\n\nالمفتاح خاص بالجهاز اللي أنشأته منه (${new Date().toLocaleDateString('ar-SA-u-ca-gregory-nu-latn')}).\nلا ترسل هذا الإيميل لأي أحد.`;
+  const mail = `mailto:${RECOVERY_EMAIL}?subject=${encodeURIComponent('مفتاح استرجاع خزنتي')}&body=${encodeURIComponent(body)}`;
+  await showSecret({ title: '🔑 مفتاح الاسترجاع', text: `اضغط «إرسال لإيميلي» عشان يتجهّز إيميل لـ ${RECOVERY_EMAIL} فيه المفتاح، وأرسله لنفسك. أي أحد عنده هذا المفتاح يقدر يفتح الخزنة، فلا تعطيه أحد.`, value: code, mail });
+}
+async function recoverWithCode(rec) {
+  const f = (await cfgGet('fails')) || { n: 0, t: 0 };
+  const wait = f.n >= 5 ? Math.min(3600, 30 * 2 ** (f.n - 5)) * 1000 - (Date.now() - f.t) : 0;
+  if (wait > 0) return lockMsg(`محاولات خاطئة كثيرة. انتظر ${Math.ceil(wait / 1000)} ثانية`);
+  const code = await ask({ title: 'مفتاح الاسترجاع', text: 'اكتب المفتاح اللي أرسلته لإيميلك (مثل ABCD-EFGH-…)', ph: 'XXXX-XXXX-XXXX-XXXX-XXXX' });
+  if (code == null) return;
+  lockMsg('جاري التحقق…', true);
+  try {
+    const k = await deriveKey(normCode(code), rec.salt, ITER);
+    const { pw } = await decJSON(k, rec.iv, rec.ct);
+    const v = await cfgGet('vault');
+    const key = await deriveKey(pw, v.salt, v.iter);
+    await decJSON(key, v.viv, v.vct);
+    await cfgSet('fails', { n: 0, t: 0 });
+    KEY = key; await enterApp();
+    await showSecret({ title: 'كلمة مرورك', text: 'هذي كلمة مرور خزنتك. احفظها في مكان آمن.', value: pw });
+  } catch {
+    await cfgSet('fails', { n: f.n + 1, t: Date.now() });
+    lockMsg('مفتاح الاسترجاع غير صحيح');
+  }
+}
+$('#recBtn').onclick = async () => {
+  $('#settings').hidden = true;
+  const pw = await ask({ title: 'مفتاح استرجاع جديد', text: 'للتأكيد اكتب كلمة مرور الخزنة. أي مفتاح قديم بيتوقف عن العمل.', type: 'password', ph: 'كلمة المرور' });
+  if (pw == null) return;
+  const v = await cfgGet('vault');
+  try { await decJSON(await deriveKey(pw, v.salt, v.iter), v.viv, v.vct); } catch { return toast('كلمة المرور غير صحيحة'); }
+  busy++; try { await setupRecovery(pw); } finally { busy--; lastActive = Date.now(); }
+};
 
 /* ---------- القفل ---------- */
 async function initLock() {
@@ -467,6 +538,7 @@ $('#lockForm').onsubmit = async e => {
       const { iv, ct } = await encJSON(key, { v: 'khaznati' });
       await cfgSet('vault', { salt, iter: ITER, viv: iv, vct: ct });
       KEY = key; await enterApp();
+      if (await choose('تبغى تسوي مفتاح استرجاع لكلمة المرور وترسله لإيميلك؟', [{ l: '📧 نعم', v: true }, { l: 'لاحقًا', v: false }])) await setupRecovery(pw);
     } finally { btn.disabled = false; }
     return;
   }
@@ -486,6 +558,13 @@ $('#lockForm').onsubmit = async e => {
 };
 
 $('#forgot').onclick = async () => {
+  const rec = await cfgGet('recovery');
+  const c = await choose('نسيت كلمة المرور؟', [
+    rec && { l: '🔑 عندي مفتاح الاسترجاع (من الإيميل)', v: 'rec' },
+    { l: '🗑 حذف الخزنة والبدء من جديد', v: 'wipe', danger: true },
+  ].filter(Boolean));
+  if (c === 'rec') return recoverWithCode(rec);
+  if (c !== 'wipe') return;
   if (!confirm('ما فيه طريقة لاسترجاع كلمة المرور لأن الملفات مشفّرة بها.\n\nتبغى تحذف الخزنة بكل ملفاتها من هذا الجهاز وتبدأ من جديد؟')) return;
   if (!confirm('تأكيد أخير: سيتم حذف كل الملفات نهائيًا. متأكد؟')) return;
   await wipe();
@@ -503,7 +582,7 @@ async function enterApp() {
 
 function lock() {
   KEY = null; closeViewer();
-  ['#settings', '#askModal', '#act'].forEach(s => $(s).hidden = true);
+  ['#settings', '#askModal', '#act', '#secModal'].forEach(s => $(s).hidden = true);
   hideToast();
   items.forEach(it => it.thumb && URL.revokeObjectURL(it.thumb));
   items = []; folders = []; fkeys.clear(); counts.clear(); cur = null;
@@ -816,6 +895,8 @@ async function moveItem(it, to) {
 /* ---------- الإعدادات ---------- */
 $('#setBtn').onclick = async () => {
   $('#settings').hidden = false;
+  const rec = await cfgGet('recovery');
+  $('#recInfo').textContent = rec ? `✓ مفتاح الاسترجاع مجهّز (${new Date(rec.at).toLocaleDateString('ar-SA-u-ca-gregory-nu-latn')}). اضغط الزر لو تبغى مفتاح جديد.` : '⚠️ ما سويت مفتاح استرجاع للحين. لو نسيت كلمة المرور بتضيع ملفاتك.';
   try {
     const e = await navigator.storage.estimate();
     const pers = await navigator.storage.persisted?.();
