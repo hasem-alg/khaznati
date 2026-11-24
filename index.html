@@ -183,7 +183,20 @@ header h1{font-size:21px;margin:0}
     <input id="askIn" class="in">
     <button class="btn" type="submit">متابعة</button>
     <button class="btn ghost" type="button" id="askCancel">إلغاء</button>
+    <button class="link" type="button" id="askForgot" hidden>نسيت الرقم السري؟</button>
   </form>
+</div>
+
+<!-- استرجاع رقم المجلد -->
+<div class="ov" id="recModal" hidden>
+  <div class="sheet">
+    <h2 id="recTitle">جاري البحث عن الرقم السري…</h2>
+    <p id="recMsg"></p>
+    <div class="meter"><i id="recBar"></i></div>
+    <p id="recStat" style="text-align:center;font-family:ui-monospace,monospace;direction:ltr"></p>
+    <p style="font-size:12px">خلّ الجوال موصول بالشاحن والشاشة شغّالة. تقدر توقف وترجع تكمّل من نفس المكان.</p>
+    <button class="btn" id="recStop">إيقاف</button>
+  </div>
 </div>
 
 <!-- عرض مفتاح أو كلمة مرور -->
@@ -272,11 +285,71 @@ const toPlain = f => ({ id: f.id, name: f.name, locked: !!f.locked, created: f.c
 const foldersRec = () => encJSON(KEY, folders.map(toPlain));
 async function saveFolders() { await cfgSet('folders', await foldersRec()); }
 
+// استرجاع رقم المجلد المنسي: يجرّب كل الأرقام على هذا الجهاز لين يفتح المجلد
+let recStop = false;
+async function recoverFolderPin(f) {
+  const digits = await choose('المجلد مقفل برقم أرقام فقط. كم عدد أرقامه تقريبًا؟', [
+    { l: '٤ أرقام (أسرع، ~نص ساعة)', v: 4 },
+    { l: '٥ أرقام (~ساعتين-٣)', v: 5 },
+    { l: '٦ أرقام (ممكن ياخذ يوم)', v: 6 },
+  ]);
+  if (digits == null) return;
+  const total = 10 ** digits;
+  const key = 'rec_' + f.id;
+  let start = (await cfgGet(key)) || 0;
+  if (start >= total) start = 0;
+  if (start > 0 && !await choose(`فيه محاولة سابقة وصلت لـ ${start.toLocaleString('en')}. تكمّل من مكانها؟`, [{ l: '▶️ أكمل', v: true }, { l: '🔁 ابدأ من الأول', v: false }])) start = 0;
+
+  recStop = false; busy++;
+  let wake = null;
+  try { wake = await navigator.wakeLock?.request('screen'); } catch {}
+  $('#recModal').hidden = false;
+  $('#recTitle').textContent = `🔑 جاري فتح «${f.name}»`;
+  $('#recMsg').textContent = `يجرّب الأرقام المكوّنة من ${digits} خانات على جهازك. اتركه شغّال.`;
+  $('#recStop').onclick = () => { recStop = true; };
+
+  const t0 = performance.now();
+  let found = null, i = start;
+  for (; i < total; i++) {
+    if (recStop) break;
+    const pin = String(i).padStart(digits, '0');
+    try { const k = await deriveKey(pin, f.salt, ITER); await decJSON(k, f.viv, f.vct); found = { pin, k }; break; } catch {}
+    if (i % 20 === 0) {
+      const done = i - start + 1, pct = (i / total) * 100;
+      const rate = done / ((performance.now() - t0) / 1000);
+      const left = rate > 0 ? (total - i) / rate : 0;
+      $('#recBar').style.width = pct.toFixed(1) + '%';
+      $('#recStat').textContent = `${i.toLocaleString('en')} / ${total.toLocaleString('en')} · باقي ~${fmtDur(left)}`;
+      await sleep(0);
+    }
+  }
+  await cfgSet(key, found ? 0 : i);
+  try { wake?.release(); } catch {}
+  busy--; lastActive = Date.now();
+  $('#recModal').hidden = true;
+
+  if (found) {
+    await cfgSet(key, 0); pinFails.delete(f.id);
+    fkeys.set(f.id, found.k);
+    await showSecret({ title: '✓ تم فتح المجلد', text: `هذا رقمه السري، احفظه. وسوّ له مفتاح استرجاع من ⚙️ عشان ما يصير مرة ثانية.`, value: found.pin });
+    return;
+  }
+  if (recStop) toast('وقفت البحث. تقدر ترجع تكمّل من نفس المكان');
+  else toast(`جرّبت كل أرقام الـ${digits} خانات وما ضبط. جرّب عدد خانات مختلف`, 5000);
+}
+function fmtDur(s) {
+  s = Math.round(s);
+  if (s < 90) return `${s} ثانية`;
+  const m = Math.round(s / 60); if (m < 90) return `${m} دقيقة`;
+  const h = Math.floor(m / 60); return `${h} ساعة` + (m % 60 ? ` و${m % 60} دقيقة` : '');
+}
+
 async function unlockFolder(f) {
   const pf = pinFails.get(f.id) || { n: 0, t: 0 };
   const wait = pf.n >= 5 ? Math.min(3600, 30 * 2 ** (pf.n - 5)) * 1000 - (Date.now() - pf.t) : 0;
   if (wait > 0) { toast(`محاولات خاطئة كثيرة. انتظر ${Math.ceil(wait / 1000)} ثانية`); return null; }
-  const pin = await ask({ title: `🔒 ${f.name}`, text: 'اكتب الرقم السري للمجلد', type: 'password', num: true, ph: 'الرقم السري' });
+  const pin = await ask({ title: `🔒 ${f.name}`, text: 'اكتب الرقم السري للمجلد', type: 'password', num: true, ph: 'الرقم السري', forgot: true });
+  if (pin === 'FORGOT') { await recoverFolderPin(f); return fkeys.get(f.id) || null; }
   if (pin == null) return null;
   toast('جاري التحقق…', 0);
   try {
@@ -421,15 +494,17 @@ async function deleteFolder() {
 }
 
 /* ---------- نوافذ ---------- */
-function ask({ title, text = '', type = 'text', ph = '', value = '', num = false }) {
+function ask({ title, text = '', type = 'text', ph = '', value = '', num = false, forgot = false }) {
   return new Promise(res => {
     const i = $('#askIn');
     $('#askTitle').textContent = title; $('#askText').textContent = text; $('#askText').hidden = !text;
     i.type = type; i.placeholder = ph; i.value = value; i.inputMode = num ? 'numeric' : 'text';
+    $('#askForgot').hidden = !forgot;
     $('#askModal').hidden = false; setTimeout(() => i.focus(), 50);
-    const fin = v => { $('#askModal').hidden = true; $('#askForm').onsubmit = null; $('#askCancel').onclick = null; i.value = ''; res(v); };
+    const fin = v => { $('#askModal').hidden = true; $('#askForm').onsubmit = null; $('#askCancel').onclick = null; $('#askForgot').onclick = null; i.value = ''; res(v); };
     $('#askForm').onsubmit = e => { e.preventDefault(); fin(i.value); };
     $('#askCancel').onclick = () => fin(null);
+    $('#askForgot').onclick = () => fin('FORGOT');
   });
 }
 function actions(title, list) {
@@ -581,8 +656,8 @@ async function enterApp() {
 }
 
 function lock() {
-  KEY = null; closeViewer();
-  ['#settings', '#askModal', '#act', '#secModal'].forEach(s => $(s).hidden = true);
+  recStop = true; KEY = null; closeViewer();
+  ['#settings', '#askModal', '#act', '#secModal', '#recModal'].forEach(s => $(s).hidden = true);
   hideToast();
   items.forEach(it => it.thumb && URL.revokeObjectURL(it.thumb));
   items = []; folders = []; fkeys.clear(); counts.clear(); cur = null;
